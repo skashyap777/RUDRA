@@ -126,20 +126,31 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> createProfile(FormData data) async {
     try {
+      debugPrint("Creating profile with form data");
       final response = await apiService.postMultipart(
         url: "/profile/create",
         formData: data,
       );
+      debugPrint("Create Profile Response Status: ${response.statusCode}");
+      debugPrint("Create Profile Response Data: ${response.data}");
+
       if (response.statusCode == 200 || response.statusCode == 201) {
         final profile = response.data['data']['profile'];
         await TokenHandler.setString("user", jsonEncode(profile));
         userData = Profile.fromJson(response.data);
+        debugPrint("Profile created successfully");
         return true;
+      } else {
+        debugPrint(
+          "Profile creation failed with status: ${response.statusCode}",
+        );
+        debugPrint("Error response: ${response.data}");
+        return false;
       }
-      return false;
     } catch (e) {
+      debugPrint("Profile creation error: $e");
       return false;
-    } finally {}
+    }
   }
 
   Future<bool> checkLocationWithpin(int pincode) async {

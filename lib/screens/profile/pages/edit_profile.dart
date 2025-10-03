@@ -268,14 +268,27 @@ class _EditProfileState extends State<EditProfile> {
                 // Save button
                 ElevatedButton(
                   onPressed: () async {
+                    final profileProvider = Provider.of<ProfileProvider>(
+                      context,
+                      listen: false,
+                    );
                     final res = await profileProvider.updateUserName(
                       _nameController.text,
                     );
                     if (res) {
+                      // Refresh the provider to update the UI
+                      await profileProvider.getProfileData();
                       AppFunctions.showCustomSnackBar(
                         context,
                         "Profile updated successfully!",
                       );
+                      // Update the text fields with the new data
+                      setState(() {
+                        _nameController.text =
+                            profileProvider.profile?.data?.profile?.name ?? "";
+                        _locationController.text =
+                            profileProvider.profile?.data?.profile?.address ?? "";
+                      });
                     } else {
                       AppFunctions.showCustomSnackBar(
                         context,

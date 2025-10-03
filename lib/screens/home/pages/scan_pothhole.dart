@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rudra/config/theme/app_pallet.dart';
 import 'package:rudra/config/utils/app_functions.dart';
@@ -22,21 +23,63 @@ class _ScanPothholeState extends State<ScanPothhole>
   @override
   void initState() {
     super.initState();
-    detector.loadModel();
+    // Initialize detector and animation
+    _initializeDetector();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: false);
+      duration: const Duration(
+        milliseconds: 1500,
+      ), // Faster, smoother animation
+    );
     _animation = Tween<double>(
       begin: 0,
       end: 1,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.linear));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
+    // Start animation
+    _controller.repeat(reverse: true); // Changed to true to make it bounce back and forth
+
+    // Start processing after initialization
+    _startProcessing();
+  }
+
+  Future<void> _initializeDetector() async {
+    try {
+      await detector.loadModel();
+      print("Detector initialized successfully");
+    } catch (e) {
+      print("Failed to initialize detector: $e");
+    }
+  }
+
+  void _startProcessing() {
     Future.delayed(const Duration(seconds: 3), () async {
       if (mounted) {
-        final result = await detector.predict(widget.file);
-        AppFunctions.showCustomSnackBar(context, result);
-        context.pushReplacement('/potholeDetected', extra: widget.file);
+        try {
+          print("Starting AI processing...");
+          // Use the detector instance that was already initialized
+          // Run prediction in background to prevent UI freezing
+          final result = await detector.predictInBackground(widget.file);
+          print("AI Prediction result: $result");
+
+          // Navigate to appropriate screen based on detection result
+          if (result.contains("pothole detected") && !result.contains("No pothole detected")) {
+            // Pothole detected - navigate to success screen
+            context.pushReplacement('/potholeDetected', extra: widget.file);
+          } else {
+            // No pothole detected - navigate to info screen
+            context.pushReplacement('/noPotholeDetected', extra: widget.file);
+          }
+        } catch (e) {
+          print("Error during AI prediction: $e");
+          AppFunctions.showCustomSnackBar(
+            context,
+            "Failed to analyze image. Please try again.",
+            backgroundColor: Colors.red,
+          );
+          // Navigate back to dashboard on error
+          Navigator.pop(context);
+        }
       }
     });
   }

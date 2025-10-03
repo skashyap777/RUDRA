@@ -20,3 +20,7 @@ workflows:
       app_store_connect:
         api_key: $APP_STORE_CONNECT_API_KEY
         submit_to_testflight: true
+        # Add export compliance information
+        export_compliance:
+          uses_encryption: false # Set to true if your app uses encryption
+          encryption_updated: false # Set to true if encryption has been updated

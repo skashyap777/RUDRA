@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:rudra/config/utils/app_functions.dart';
 import 'package:rudra/screens/auth/provider/auth_provide.dart';
@@ -18,6 +19,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
 
   File? profilePhoto;
   bool isLoading = false;
@@ -29,9 +31,55 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     super.dispose();
   }
 
-  Future<void> _uploadPhoto() async {
-    profilePhoto = await AppFunctions.uploadFromDevice();
-    setState(() {});
+  // Function to show image picker bottom sheet
+  void _showImagePickerBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Camera'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Function to pick image from camera or gallery
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: source,
+        imageQuality: 85,
+      );
+
+      if (pickedFile != null) {
+        setState(() {
+          profilePhoto = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
+    }
   }
 
   void _deletePhoto() {
@@ -42,19 +90,58 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
   void _continue() async {
     if (_formKey.currentState?.validate() ?? false) {
-      final provider = Provider.of<AuthProvider>(context, listen: false);
-      final formData = FormData.fromMap({
-        'name': _nameController.text,
-        'com_address': _addressController.text,
-        'profile_photo': await MultipartFile.fromFile(
-          profilePhoto!.path,
-          filename: profilePhoto!.path.split("/").last,
-          contentType: DioMediaType('image', 'png'),
-        ),
+      // Validate that profile photo is selected
+      if (profilePhoto == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select a profile photo')),
+        );
+        return;
+      }
+
+      setState(() {
+        isLoading = true;
       });
-      final res = await provider.createProfile(formData);
-      if (res) {
-        context.push("/welcome");
+
+      try {
+        final provider = Provider.of<AuthProvider>(context, listen: false);
+
+        // Get the correct content type based on file extension
+        final fileExtension = profilePhoto!.path.split('.').last.toLowerCase();
+        final contentType =
+            fileExtension == 'png'
+                ? 'image/png'
+                : fileExtension == 'jpg' || fileExtension == 'jpeg'
+                ? 'image/jpeg'
+                : 'image/jpeg'; // default fallback
+
+        final formData = FormData.fromMap({
+          'name': _nameController.text,
+          'com_address': _addressController.text,
+          'profile_photo': await MultipartFile.fromFile(
+            profilePhoto!.path,
+            filename: profilePhoto!.path.split("/").last,
+            contentType: DioMediaType.parse(contentType),
+          ),
+        });
+
+        final res = await provider.createProfile(formData);
+        if (res) {
+          context.push("/welcome");
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to create profile. Please try again.'),
+            ),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload error: ${e.toString()}')),
+        );
+      } finally {
+        setState(() {
+          isLoading = false;
+        });
       }
     }
   }
@@ -243,7 +330,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                   Column(
                     children: [
                       OutlinedButton.icon(
-                        onPressed: _uploadPhoto,
+                        onPressed: _showImagePickerBottomSheet,
                         icon: const Icon(
                           Icons.upload,
                           size: 16,

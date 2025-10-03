@@ -24,7 +24,10 @@ class PotholeDetectedScreen extends StatelessWidget {
               icon: const Icon(Icons.arrow_back, color: Colors.white),
               onPressed: () => Navigator.pop(context),
             ),
-
+            title: const Text(
+              "Scan Result",
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
             centerTitle: true,
           ),
           body: Column(

@@ -44,6 +44,8 @@ class ProfileProvider extends ChangeNotifier {
         data: formData,
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
+        // Refresh profile data after successful update
+        await getProfileData();
         return true;
       }
       return false;
@@ -58,9 +60,13 @@ class ProfileProvider extends ChangeNotifier {
     try {
       final response = await apiService.patch(
         url: "/profile/update-name",
-        data: {name: name},
+        data: {
+          "name": name,
+        }, // Fixed: Use "name" as the key, not the variable name
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
+        // Refresh profile data after successful update
+        await getProfileData();
         return true;
       }
       return false;

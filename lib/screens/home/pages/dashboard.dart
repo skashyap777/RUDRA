@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rudra/config/theme/app_pallet.dart';
 import 'package:rudra/config/utils/app_functions.dart';
@@ -67,12 +68,14 @@ class _DashboardState extends State<Dashboard> {
             ), // green shade like your image
             elevation: 0,
             automaticallyImplyLeading: false,
+            toolbarHeight:
+                80, // Increased height for proper circular profile image
             flexibleSpace: Padding(
               padding: const EdgeInsets.only(
                 left: 16,
                 right: 16,
-                top: 40,
-                bottom: 10,
+                top: 35,
+                bottom: 15,
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -105,21 +108,28 @@ class _DashboardState extends State<Dashboard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          store.userdetails?.name ?? "",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                        Flexible(
+                          child: Text(
+                            store.userdetails?.name ?? "",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        SizedBox(height: 4),
-                        Text(
-                          store.userdetails?.address ?? "",
-                          style: TextStyle(fontSize: 12, color: Colors.white),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                        SizedBox(height: 2),
+                        Flexible(
+                          child: Text(
+                            store.userdetails?.address ?? "",
+                            style: TextStyle(fontSize: 12, color: Colors.white),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
@@ -340,23 +350,160 @@ class PotholeDetector {
   late List<String> _labels;
 
   final int inputSize = 640;
-  final double confidenceThreshold = 0.3;
+  final double confidenceThreshold =
+      0.02; // Consistent threshold for classification and final check
 
   Future<void> loadModel() async {
-    _interpreter = await Interpreter.fromAsset(
-      'assets/model/best_float32.tflite',
-    );
-    _labels =
-        (await rootBundle.loadString(
-          'assets/model/labels.txt',
-        )).split('\n').where((e) => e.trim().isNotEmpty).toList();
+    try {
+      print("Loading AI model...");
+      _interpreter = await Interpreter.fromAsset(
+        'assets/model/best_float32.tflite',
+      );
+      _labels =
+          (await rootBundle.loadString(
+            'assets/model/labels.txt',
+          )).split('\n').where((e) => e.trim().isNotEmpty).toList();
+      print("AI Model loaded successfully. Labels: $_labels");
+      print("Model input shape: ${_interpreter.getInputTensors()}");
+      print("Model output shape: ${_interpreter.getOutputTensors()}");
+    } catch (e) {
+      print("Error loading AI model: $e");
+      throw Exception("Failed to load AI model: $e");
+    }
   }
 
   Future<String> predict(File imageFile) async {
+    try {
+      print("Starting prediction...");
+      final bytes = await imageFile.readAsBytes();
+      print("Image bytes loaded: ${bytes.length}");
+      final raw = img.decodeImage(bytes);
+      if (raw == null) {
+        print("Failed to decode image");
+        return "Invalid image";
+      }
+      print("Image decoded successfully: ${raw.width}x${raw.height}");
+
+      final resized = img.copyResize(raw, width: inputSize, height: inputSize);
+      print("Image resized to: ${resized.width}x${resized.height}");
+
+      // Build input: shape [1, 640, 640, 3]
+      List<List<List<List<double>>>> input = List.generate(
+        1,
+        (_) => List.generate(inputSize, (y) {
+          return List.generate(inputSize, (x) {
+            final pixel = resized.getPixel(x, y);
+            final r = pixel.r / 255.0;
+            final g = pixel.g / 255.0;
+            final b = pixel.b / 255.0;
+            return [r, g, b];
+          });
+        }),
+      );
+      print("Input tensor created with shape: [1, $inputSize, $inputSize, 3]");
+
+      // Output buffer: shape [1, 5, 8400] for YOLO format [batch, features, anchors]
+      final output = List.generate(
+        1,
+        (_) => List.generate(5, (_) => List.filled(8400, 0.0)),
+      );
+      print("Output buffer created with shape: [1, 5, 8400]");
+
+      print("Running model inference...");
+      _interpreter.run(input, output);
+      print("Model inference completed");
+
+      final results = output[0]; // Shape: [5, 8400]
+      double maxConfidence = 0.0;
+      int bestClassIndex = -1;
+
+      // Parse YOLO outputs
+      List<double> confidenceValues = [];
+      int highConfidenceCount = 0;
+      for (int i = 0; i < 8400; i++) {
+        // YOLO format: [x, y, w, h, confidence, class1, class2, ...]
+        // But our model outputs [x, y, w, h, confidence] where confidence is objectness * class_prob
+        final confidence = results[4][i];
+        confidenceValues.add(confidence);
+
+        // Count high confidence detections
+        if (confidence > confidenceThreshold) {
+          highConfidenceCount++;
+        }
+
+        if (confidence > maxConfidence) {
+          maxConfidence = confidence;
+          // For this model, use relative confidence - higher values indicate detections
+          // Since the model produces values in range 0.0001-0.13, we use a consistent threshold
+          bestClassIndex =
+              confidence > confidenceThreshold
+                  ? 0
+                  : 1; // 0 = pothole, 1 = no_pothole
+        }
+      }
+
+      // Debug: Show some sample confidence values
+      print(
+        "Sample confidence values (first 10): ${confidenceValues.take(10)}",
+      );
+      print(
+        "Max confidence in all values: ${confidenceValues.reduce((a, b) => a > b ? a : b)}",
+      );
+      print(
+        "Min confidence in all values: ${confidenceValues.reduce((a, b) => a < b ? a : b)}",
+      );
+      print(
+        "Values above ${confidenceThreshold * 100}% threshold: ${confidenceValues.where((c) => c > confidenceThreshold).length}",
+      );
+
+      print(
+        "Max confidence found: $maxConfidence, Best class index: $bestClassIndex",
+      );
+
+      if (bestClassIndex != -1 && maxConfidence >= confidenceThreshold) {
+        final label = _labels[bestClassIndex];
+        final percentage = (maxConfidence * 100).toStringAsFixed(1);
+        print("Prediction result: $label detected (${percentage}%)");
+        return "$label detected (${percentage}%)";
+      } else {
+        print("No detection above threshold");
+        return "No pothole detected";
+      }
+    } catch (e) {
+      print("Error during prediction: $e");
+      return "Error processing image";
+    }
+  }
+
+  // New method to run prediction in background isolate
+  Future<String> predictInBackground(File imageFile) async {
+    // Use compute to run the prediction in a background isolate
+    return await compute(_predictInBackground, imageFile.path);
+  }
+
+  void dispose() {
+    _interpreter.close();
+  }
+}
+
+// Top-level function for background processing
+Future<String> _predictInBackground(String imagePath) async {
+  // This function runs in a background isolate
+  // We need to re-initialize the model in the isolate
+  try {
+    // Load model in isolate
+    final interpreter = await Interpreter.fromAsset('assets/model/best_float32.tflite');
+    final labelData = await rootBundle.loadString('assets/model/labels.txt');
+    final labels = labelData.split('\n').where((e) => e.trim().isNotEmpty).toList();
+    
+    final imageFile = File(imagePath);
     final bytes = await imageFile.readAsBytes();
     final raw = img.decodeImage(bytes);
-    if (raw == null) return "Invalid image";
+    if (raw == null) {
+      return "Invalid image";
+    }
 
+    final inputSize = 640;
     final resized = img.copyResize(raw, width: inputSize, height: inputSize);
 
     // Build input: shape [1, 640, 640, 3]
@@ -373,90 +520,38 @@ class PotholeDetector {
       }),
     );
 
-    // Correct output buffer: shape [1, 5, 8400]
+    // Output buffer: shape [1, 5, 8400] for YOLO format [batch, features, anchors]
     final output = List.generate(
       1,
       (_) => List.generate(5, (_) => List.filled(8400, 0.0)),
     );
 
-    _interpreter.run(input, output);
+    interpreter.run(input, output);
+    interpreter.close();
 
     final results = output[0]; // Shape: [5, 8400]
-    String? topLabel;
     double maxConfidence = 0.0;
+    int bestClassIndex = -1;
+    final confidenceThreshold = 0.02;
 
+    // Parse YOLO outputs
     for (int i = 0; i < 8400; i++) {
       final confidence = results[4][i];
-
-      if (confidence < confidenceThreshold) continue;
       if (confidence > maxConfidence) {
         maxConfidence = confidence;
-        topLabel = _labels.isNotEmpty ? _labels[0] : "Pothole";
+        bestClassIndex = confidence > confidenceThreshold ? 0 : 1; // 0 = pothole, 1 = no_pothole
       }
     }
 
-    if (topLabel != null && (maxConfidence * 100) > 50.0) {
-      return "$topLabel (${(maxConfidence * 100).toStringAsFixed(2)}%)";
+    if (bestClassIndex != -1 && maxConfidence >= confidenceThreshold) {
+      // Note: We can't access _labels here in the isolate, so we'll use hardcoded values
+      final label = bestClassIndex == 0 ? "pothole" : "no_pothole";
+      final percentage = (maxConfidence * 100).toStringAsFixed(1);
+      return "$label detected (${percentage}%)";
     } else {
-      return "$topLabel";
+      return "No pothole detected";
     }
-  }
-
-  void dispose() {
-    _interpreter.close();
+  } catch (e) {
+    return "Error processing image";
   }
 }
-
-// // Enhanced AppFunctions class with scanner support
-// class AppFunctions {
-//   static Future<Position?> requestLocationPermission() async {
-//     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-//     if (!serviceEnabled) {
-//       return null;
-//     }
-
-//     var status = await Permission.location.request();
-
-//     if (status.isGranted) {
-//       try {
-//         Position position = await Geolocator.getCurrentPosition(
-//           desiredAccuracy: LocationAccuracy.high,
-//         );
-//         return position;
-//       } catch (e) {
-//         return null;
-//       }
-//     } else if (status.isDenied) {
-//       return null;
-//     } else if (status.isPermanentlyDenied) {
-//       openAppSettings();
-//       return null;
-//     }
-
-//     return null;
-//   }
-
-//   static Future<File?> captureImageFromCamera() async {
-//     final ImagePicker picker = ImagePicker();
-//     final XFile? photo = await picker.pickImage(
-//       source: ImageSource.camera,
-//       imageQuality: 85,
-//     );
-//     if (photo != null) {
-//       return File(photo.path);
-//     }
-//     return null;
-//   }
-
-//   static Future<File?> uploadFromDevice() async {
-//     final ImagePicker picker = ImagePicker();
-//     final XFile? photo = await picker.pickImage(
-//       source: ImageSource.gallery,
-//       imageQuality: 85,
-//     );
-//     if (photo != null) {
-//       return File(photo.path);
-//     }
-//     return null;
-//   }
-// }

@@ -6,7 +6,7 @@ publish_to: 'none'
 
 # Version: <major>.<minor>.<patch>+<build>
 # Increment the build number for every App Store upload
-version: 1.0.0+4
+version: 1.0.0+3
 
 environment:
   sdk: ^3.7.2
@@ -69,4 +69,3 @@ flutter_launcher_icons:
   image_path: "assets/img/logo.png"
   adaptive_icon_background: "#2E7D6F"
   adaptive_icon_foreground: "assets/img/logo.png"
-  remove_alpha_ios: true

@@ -12,6 +12,7 @@ import 'package:rudra/screens/home/pages/home.dart';
 import 'package:rudra/screens/home/pages/pothole_detected_screen.dart';
 import 'package:rudra/screens/home/pages/pothole_scanner.dart';
 import 'package:rudra/screens/home/pages/scan_pothhole.dart';
+import 'package:rudra/screens/home/pages/no_pothole_detected_screen.dart';
 import 'package:rudra/screens/profile/pages/edit_profile.dart';
 
 class Routes {
@@ -54,6 +55,12 @@ class Routes {
         builder:
             (context, state) =>
                 PotholeDetectedScreen(file: state.extra as File),
+      ),
+      GoRoute(
+        path: '/noPotholeDetected',
+        builder:
+            (context, state) =>
+                NoPotholeDetectedScreen(file: state.extra as File),
       ),
       GoRoute(path: '/addPothole', builder: (context, state) => AddPothole()),
 
