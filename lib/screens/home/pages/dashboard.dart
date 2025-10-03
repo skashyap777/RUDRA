@@ -74,7 +74,7 @@ class _DashboardState extends State<Dashboard> {
               padding: const EdgeInsets.only(
                 left: 16,
                 right: 16,
-                top: 35,
+                top: 65,
                 bottom: 15,
               ),
               child: Row(
@@ -82,20 +82,18 @@ class _DashboardState extends State<Dashboard> {
                 children: [
                   // Profile Image
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(20), // Same as radius
+                    borderRadius: BorderRadius.circular(25), // Same as radius
                     child:
                         store.loading
                             ? CircularProgressIndicator()
                             : Image.network(
                               "${Constants.baseUrl}${store.userdetails?.profilePhotoLink}",
-                              width: 40,
-                              height: 40,
+                              width: 50,
+                              height: 50,
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
                                 return Image.asset(
                                   Assets.profile,
-                                  width: 40,
-                                  height: 40,
                                   fit: BoxFit.cover,
                                 );
                               },
@@ -492,10 +490,13 @@ Future<String> _predictInBackground(String imagePath) async {
   // We need to re-initialize the model in the isolate
   try {
     // Load model in isolate
-    final interpreter = await Interpreter.fromAsset('assets/model/best_float32.tflite');
+    final interpreter = await Interpreter.fromAsset(
+      'assets/model/best_float32.tflite',
+    );
     final labelData = await rootBundle.loadString('assets/model/labels.txt');
-    final labels = labelData.split('\n').where((e) => e.trim().isNotEmpty).toList();
-    
+    final labels =
+        labelData.split('\n').where((e) => e.trim().isNotEmpty).toList();
+
     final imageFile = File(imagePath);
     final bytes = await imageFile.readAsBytes();
     final raw = img.decodeImage(bytes);
@@ -539,7 +540,10 @@ Future<String> _predictInBackground(String imagePath) async {
       final confidence = results[4][i];
       if (confidence > maxConfidence) {
         maxConfidence = confidence;
-        bestClassIndex = confidence > confidenceThreshold ? 0 : 1; // 0 = pothole, 1 = no_pothole
+        bestClassIndex =
+            confidence > confidenceThreshold
+                ? 0
+                : 1; // 0 = pothole, 1 = no_pothole
       }
     }
 
