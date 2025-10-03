@@ -79,18 +79,20 @@ class _DashboardState extends State<Dashboard> {
                 children: [
                   // Profile Image
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(25), // Same as radius
+                    borderRadius: BorderRadius.circular(20), // Same as radius
                     child:
                         store.loading
                             ? CircularProgressIndicator()
                             : Image.network(
                               "${Constants.baseUrl}${store.userdetails?.profilePhotoLink}",
-                              width: 50,
-                              height: 50,
+                              width: 40,
+                              height: 40,
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
                                 return Image.asset(
                                   Assets.profile,
+                                  width: 40,
+                                  height: 40,
                                   fit: BoxFit.cover,
                                 );
                               },
