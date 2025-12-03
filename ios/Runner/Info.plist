@@ -50,21 +50,6 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app needs location access to detect potholes at your current location.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>This app needs location access to detect potholes and report their exact location.</string>
-	
-	<!-- Camera permission for pothole detection -->
-	<key>NSCameraUsageDescription</key>
-	<string>This app needs camera access to take photos of potholes for detection and reporting.</string>
-
-	<!-- Photo library permission for image picker -->
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app needs access to your photo library to select images for pothole reporting.</string>
-
-	<!-- Microphone permission (if needed for any feature) -->
-	<key>NSMicrophoneUsageDescription</key>
-	<string>This app needs microphone access for certain features.</string>
-
-	<!-- Push notifications permission for Firebase -->
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>This app needs notification permissions to send you updates about pothole reports.</string>
 

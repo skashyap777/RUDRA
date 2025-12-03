@@ -7,13 +7,23 @@ class NotificationProvider extends ChangeNotifier {
 
   List<Data> notifications = [];
 
+  bool loading = false;
+
   Future<void> fetchNotifications() async {
-    final response = await apiService.get(
-      url: '/admin/notifications?page=1&limit=20',
-    );
-    if (response.statusCode == 200) {
-      final data = NotificationModel.fromJson(response.data);
-      notifications = data.data ?? [];
+    loading = true;
+    notifyListeners();
+    try {
+      final response = await apiService.get(
+        url: '/pothole/notifications?page=1&limit=20',
+      );
+      if (response.statusCode == 200) {
+        final data = NotificationModel.fromJson(response.data);
+        notifications = data.data ?? [];
+      }
+    } catch (e) {
+      debugPrint("Error fetching notifications: $e");
+    } finally {
+      loading = false;
       notifyListeners();
     }
   }

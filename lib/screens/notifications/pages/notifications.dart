@@ -28,115 +28,143 @@ class _NotificationsState extends State<Notifications> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppPallet.backgroundColor,
       appBar: AppBar(
-        backgroundColor: AppPallet.primaryColor,
+        backgroundColor: AppPallet.backgroundColor,
         elevation: 0,
+        centerTitle: false,
         title: const Text(
           'Notifications',
           style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
+            color: AppPallet.textPrimary,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
           ),
         ),
       ),
-      body: Consumer<NotificationProvider>(
-        builder: (context, provider, child) {
-          if (provider.notifications.isEmpty) {
-            return const Center(
-              child: CircularProgressIndicator(color: Color(0xFF4CAF50)),
-            );
-          }
+      body: SafeArea(
+        child: Consumer<NotificationProvider>(
+          builder: (context, provider, child) {
+            if (provider.loading) {
+              return const Center(
+                child: CircularProgressIndicator(color: AppPallet.primaryColor),
+              );
+            }
 
-          // Filter notifications
-          List<Data> filteredNotifications = _filterNotifications(
-            provider.notifications,
-          );
-
-          // Group notifications by date
-          Map<String, List<Data>> groupedNotifications =
-              _groupNotificationsByDate(filteredNotifications);
-
-          return Column(
-            children: [
-              // Filter chips
-              Container(
-                padding: const EdgeInsets.all(16),
-                child: Row(
+            if (provider.notifications.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _buildFilterChip(
-                      'All',
-                      _getNotificationCount(provider.notifications, 'All'),
+                    Icon(
+                      Icons.notifications_none_outlined,
+                      size: 64,
+                      color: Colors.grey.withOpacity(0.4),
                     ),
-                    const SizedBox(width: 8),
-                    _buildFilterChip(
-                      'Unread',
-                      _getNotificationCount(provider.notifications, 'Unread'),
-                    ),
-                    const SizedBox(width: 8),
-                    _buildFilterChip(
-                      'Read',
-                      _getNotificationCount(provider.notifications, 'Read'),
-                    ),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () {
-                        // Mark all as read functionality
-                      },
-                      child: const Text(
-                        'Mark as all read',
-                        style: TextStyle(
-                          color: Color(0xFF4CAF50),
-                          fontSize: 14,
-                        ),
+                    const SizedBox(height: 16),
+                    Text(
+                      "No notifications found",
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey.withOpacity(0.6),
                       ),
                     ),
                   ],
                 ),
-              ),
+              );
+            }
 
-              // Notifications list
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: groupedNotifications.keys.length,
-                  itemBuilder: (context, index) {
-                    String dateKey = groupedNotifications.keys.elementAt(index);
-                    List<Data> dayNotifications =
-                        groupedNotifications[dateKey]!;
+            // Filter notifications
+            List<Data> filteredNotifications = _filterNotifications(
+              provider.notifications,
+            );
 
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            // Group notifications by date
+            Map<String, List<Data>> groupedNotifications =
+                _groupNotificationsByDate(filteredNotifications);
+
+            return Column(
+              children: [
+                // Filter chips
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
                       children: [
-                        // Date header
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Text(
-                            dateKey,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                            ),
+                        _buildFilterChip(
+                          'All',
+                          _getNotificationCount(provider.notifications, 'All'),
+                        ),
+                        const SizedBox(width: 12),
+                        _buildFilterChip(
+                          'Unread',
+                          _getNotificationCount(
+                            provider.notifications,
+                            'Unread',
                           ),
                         ),
-
-                        // Notifications for this date
-                        ...dayNotifications
-                            .map(
-                              (notification) =>
-                                  _buildNotificationCard(context, notification),
-                            )
-                            .toList(),
+                        const SizedBox(width: 12),
+                        _buildFilterChip(
+                          'Read',
+                          _getNotificationCount(provider.notifications, 'Read'),
+                        ),
                       ],
-                    );
-                  },
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
+
+                // Notifications list
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: groupedNotifications.keys.length,
+                    itemBuilder: (context, index) {
+                      String dateKey = groupedNotifications.keys.elementAt(
+                        index,
+                      );
+                      List<Data> dayNotifications =
+                          groupedNotifications[dateKey]!;
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Date header
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: 12,
+                              top: 8,
+                              left: 4,
+                            ),
+                            child: Text(
+                              dateKey,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppPallet.textSecondary,
+                              ),
+                            ),
+                          ),
+
+                          // Notifications for this date
+                          ...dayNotifications
+                              .map(
+                                (notification) => _buildNotificationCard(
+                                  context,
+                                  notification,
+                                ),
+                              )
+                              .toList(),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -149,142 +177,212 @@ class _NotificationsState extends State<Notifications> {
           selectedFilter = label;
         });
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFFC107) : Colors.grey[200],
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Text(
-          '$label ($count)',
-          style: TextStyle(
-            color: isSelected ? Colors.black : Colors.grey[600],
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          color: isSelected ? AppPallet.primaryColor : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color:
+                isSelected
+                    ? AppPallet.primaryColor
+                    : Colors.grey.withOpacity(0.2),
           ),
+          boxShadow:
+              isSelected
+                  ? [
+                    BoxShadow(
+                      color: AppPallet.primaryColor.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                  : [],
+        ),
+        child: Row(
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : AppPallet.textSecondary,
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+            if (count > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color:
+                      isSelected
+                          ? Colors.white.withOpacity(0.2)
+                          : Colors.grey.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : AppPallet.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
   }
 
   Widget _buildNotificationCard(BuildContext context, Data notification) {
+    bool isUnread = !(notification.feedBackProvided ?? true);
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[200]!),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 2,
-            offset: const Offset(0, 1),
+            color: Colors.grey.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Notification icon
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF4CAF50).withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              _getNotificationIcon(notification.type ?? ''),
-              color: const Color(0xFF4CAF50),
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-
-          // Notification content
-          Expanded(
-            child: Column(
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            // Handle tap
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      notification.title ?? '',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    Text(
-                      _formatTime(notification.createdAt ?? ''),
-                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  notification.message ?? '',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                    height: 1.3,
+                // Notification icon
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppPallet.primaryColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _getNotificationIcon(notification.type ?? ''),
+                    color: AppPallet.primaryColor,
+                    size: 20,
                   ),
                 ),
+                const SizedBox(width: 16),
 
-                // Show feedback button for completed repairs
-                if (!(notification.feedBackProvided ?? false) &&
-                    notification.type != "rejected")
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+                // Notification content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: SizedBox(
-                          width: 100,
-                          height: 40,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              showDialog(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (BuildContext context) {
-                                  return FeedbackForm(
-                                    caseId: "${notification.caseId}",
-                                    onSubmitted: () {
-                                      print('Feedback submitted successfully');
-                                    },
-                                  );
-                                },
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppPallet.primaryColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 5,
-                                vertical: 8,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              notification.title ?? '',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight:
+                                    isUnread
+                                        ? FontWeight.bold
+                                        : FontWeight.w600,
+                                color: AppPallet.textPrimary,
                               ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              elevation: 0,
                             ),
-                            child: const Text(
-                              'Give Feedback',
-                              style: TextStyle(fontSize: 12),
+                          ),
+                          if (isUnread)
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        notification.message ?? '',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppPallet.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _formatTime(notification.createdAt ?? ''),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.withOpacity(0.6),
+                        ),
+                      ),
+
+                      // Show feedback button for completed repairs
+                      if (!(notification.feedBackProvided ?? false) &&
+                          notification.type != "rejected")
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (BuildContext context) {
+                                    return FeedbackForm(
+                                      caseId: "${notification.caseId}",
+                                      onSubmitted: () {
+                                        print(
+                                          'Feedback submitted successfully',
+                                        );
+                                      },
+                                    );
+                                  },
+                                );
+                              },
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppPallet.primaryColor,
+                                side: const BorderSide(
+                                  color: AppPallet.primaryColor,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                              ),
+                              child: const Text(
+                                'Give Feedback',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
                     ],
                   ),
+                ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -350,13 +448,13 @@ class _NotificationsState extends State<Notifications> {
   IconData _getNotificationIcon(String type) {
     switch (type.toLowerCase()) {
       case 'report':
-        return Icons.description;
+        return Icons.description_outlined;
       case 'repair':
-        return Icons.build;
+        return Icons.build_outlined;
       case 'verification':
-        return Icons.verified;
+        return Icons.verified_outlined;
       default:
-        return Icons.notifications;
+        return Icons.notifications_outlined;
     }
   }
 

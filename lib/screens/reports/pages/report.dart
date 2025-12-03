@@ -5,18 +5,6 @@ import 'package:rudra/screens/reports/models/report_model.dart';
 import 'package:rudra/screens/reports/provider/report_provider.dart';
 import 'package:provider/provider.dart';
 
-// class Report extends StatelessWidget {
-//   const Report({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return ChangeNotifierProvider(
-//       create: (context) => ReportProvider()..getReports(),
-//       child: const MyReportsScaffold(),
-//     );
-//   }
-// }
-
 class Report extends StatefulWidget {
   const Report({super.key});
 
@@ -36,17 +24,17 @@ class _ReportState extends State<Report> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppPallet.backgroundColor,
       appBar: AppBar(
-        backgroundColor: AppPallet.primaryColor,
+        backgroundColor: AppPallet.backgroundColor,
         elevation: 0,
-
+        centerTitle: false,
         title: const Text(
           'My Reports',
           style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
+            color: AppPallet.textPrimary,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
           ),
         ),
       ),
@@ -56,9 +44,10 @@ class _ReportState extends State<Report> {
             children: [
               // Filter chips
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: [
                       _buildFilterChip(
@@ -68,7 +57,7 @@ class _ReportState extends State<Report> {
                         provider.selectedFilter == 'All',
                         provider,
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 12),
                       _buildFilterChip(
                         context,
                         'Submitted',
@@ -76,7 +65,7 @@ class _ReportState extends State<Report> {
                         provider.selectedFilter == 'Submitted',
                         provider,
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 12),
                       _buildFilterChip(
                         context,
                         'In progress',
@@ -84,7 +73,7 @@ class _ReportState extends State<Report> {
                         provider.selectedFilter == 'In progress',
                         provider,
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 12),
                       _buildFilterChip(
                         context,
                         'Completed',
@@ -92,7 +81,7 @@ class _ReportState extends State<Report> {
                         provider.selectedFilter == 'Completed',
                         provider,
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 12),
                       _buildFilterChip(
                         context,
                         'Rejected',
@@ -111,21 +100,35 @@ class _ReportState extends State<Report> {
                     provider.isLoading
                         ? const Center(
                           child: CircularProgressIndicator(
-                            color: Color(0xFF4CAF50),
+                            color: AppPallet.primaryColor,
                           ),
                         )
                         : provider.reports.isEmpty
-                        ? const Center(
-                          child: Text(
-                            'No reports found',
-                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                        ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.assignment_outlined,
+                                size: 64,
+                                color: Colors.grey.withOpacity(0.4),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No reports found',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey.withOpacity(0.6),
+                                ),
+                              ),
+                            ],
                           ),
                         )
                         : RefreshIndicator(
-                          color: const Color(0xFF4CAF50),
+                          color: AppPallet.primaryColor,
                           onRefresh: () => provider.fetchReports(),
                           child: ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            padding: const EdgeInsets.all(16),
                             itemCount: provider.filteredReports.length,
                             itemBuilder: (context, index) {
                               final report = provider.filteredReports[index];
@@ -150,19 +153,61 @@ class _ReportState extends State<Report> {
   ) {
     return GestureDetector(
       onTap: () => provider.updateFilter(label),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFFC107) : Colors.grey[200],
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Text(
-          '$label ($count)',
-          style: TextStyle(
-            color: isSelected ? Colors.black : Colors.grey[600],
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          color: isSelected ? AppPallet.primaryColor : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color:
+                isSelected
+                    ? AppPallet.primaryColor
+                    : Colors.grey.withOpacity(0.2),
           ),
+          boxShadow:
+              isSelected
+                  ? [
+                    BoxShadow(
+                      color: AppPallet.primaryColor.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                  : [],
+        ),
+        child: Row(
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : AppPallet.textSecondary,
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+            if (count > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color:
+                      isSelected
+                          ? Colors.white.withOpacity(0.2)
+                          : Colors.grey.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : AppPallet.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -171,217 +216,138 @@ class _ReportState extends State<Report> {
   Widget _buildReportCard(BuildContext context, Data report) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[200]!),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 1),
+            color: Colors.grey.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Location header
-          Row(
-            children: [
-              const Icon(Icons.location_on, color: Colors.red, size: 16),
-              const SizedBox(width: 4),
-              const Text(
-                'Pothole Location',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black87,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // Location details
-          Text(
-            _buildLocationString(report),
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey[700],
-              height: 1.3,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Status and Date section
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Status column
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            // Navigate to details if needed
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header: Status and Date
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Status',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
-                        fontWeight: FontWeight.w500,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(
+                          report.status ?? '',
+                        ).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _formatStatus(report.status ?? ''),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _getStatusColor(report.status ?? ''),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    Text(
+                      _formatDateTime(report.createdAt ?? ''),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppPallet.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Location
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.location_on_outlined,
+                      color: AppPallet.primaryColor,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _buildLocationString(report),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: AppPallet.textPrimary,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Footer: Severity and Actions
+                Row(
+                  children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: _getStatusColor(report.status ?? ''),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        _formatStatus(report.status ?? ''),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Date column
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Date Reported',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _formatDateTime(report.createdAt ?? ''),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Severity and Last Updated section
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Severity column
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Severity',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      report.severity ?? 'Medium',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Last Updated column
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Last Updated',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      report.updatedAt != null
-                          ? _formatDateTime(report.updatedAt!)
-                          : '--:--',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // View Image button
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 44, // keep height consistent
-                  child: ElevatedButton.icon(
-                    onPressed: () => _showImageViewer(context, report),
-                    icon: const Icon(
-                      Icons.image,
-                      size: 18,
-                      color: Colors.white,
-                    ),
-                    label: const Text(
-                      'View Image',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4CAF50),
-                      shape: RoundedRectangleBorder(
+                        color: Colors.grey.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.warning_amber_rounded,
+                            size: 14,
+                            color: AppPallet.textSecondary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            report.severity ?? 'Medium',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppPallet.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: () => _showImageViewer(context, report),
+                      icon: const Icon(Icons.image_outlined, size: 18),
+                      label: const Text("View Image"),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppPallet.primaryColor,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 12),
-              if (report.feedBackProvided == false &&
-                  report.status != 'Rejected')
-                Expanded(
-                  child: SizedBox(
-                    height: 44,
-                    child: ElevatedButton.icon(
+                if (report.feedBackProvided == false &&
+                    report.status != 'Rejected') ...[
+                  const Divider(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
                       onPressed: () {
                         showDialog(
                           context: context,
@@ -396,30 +362,22 @@ class _ReportState extends State<Report> {
                           },
                         );
                       },
-                      icon: const Icon(
-                        Icons.feedback,
-                        size: 18,
-                        color: Colors.white,
-                      ),
-                      label: const Text(
-                        'Feedback',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2196F3),
+                      icon: const Icon(Icons.feedback_outlined, size: 18),
+                      label: const Text('Give Feedback'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppPallet.primaryColor,
+                        side: const BorderSide(color: AppPallet.primaryColor),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                     ),
                   ),
-                ),
-            ],
+                ],
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }

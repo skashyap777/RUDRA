@@ -1,8 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:rudra/config/utils/local_storage.dart';
 
+import 'package:rudra/config/constants/api_constants.dart';
+
 Future<Dio> createBaseDio() async {
-  final String baseUrl = "https://pwd.mockify.org/api/v1";
+  final String baseUrl = ApiConstants.baseUrl;
   final BaseOptions baseOptions = BaseOptions(
     baseUrl: baseUrl,
     connectTimeout: const Duration(milliseconds: 30000),
@@ -21,7 +23,7 @@ class HTTP {
   HTTP() {
     _dioClient = Dio(
       BaseOptions(
-        baseUrl: "https://pwd.mockify.org/api/v1",
+        baseUrl: ApiConstants.baseUrl,
         connectTimeout: const Duration(milliseconds: 30000),
         receiveTimeout: const Duration(milliseconds: 30000),
       ),

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -428,44 +429,71 @@ class _AddPotholeState extends State<AddPothole> {
     );
   }
 
-  void submitReport() async {
-    final provider = Provider.of<HomeProvider>(context, listen: false);
-    List<MultipartFile> potholeImages = [];
-    for (var i = 0; i < provider.potholeImages.length; i++) {
-      potholeImages.add(
-        await MultipartFile.fromFile(
-          provider.potholeImages[i].path,
-          filename: "pothole_$i.png",
-          contentType: DioMediaType("image", "png"),
-        ),
-      );
-    }
+  bool _isSubmitting = false;
 
-    String coordinatesJson = provider.coordinates.toString();
-    FormData formData = FormData.fromMap({
-      "potholeImages": potholeImages,
-      "coordinates": coordinatesJson,
-      "severity": severity,
-      "area_details": _areaController.text,
-      "landmark": _landmarkController.text,
-      "remarks": _remarkController.text,
+  void submitReport() async {
+    if (_isSubmitting) return; // Prevent duplicate submissions
+    
+    setState(() {
+      _isSubmitting = true;
     });
 
-    provider.createPothole(formData);
+    try {
+      final provider = Provider.of<HomeProvider>(context, listen: false);
+      List<MultipartFile> potholeImages = [];
+      for (var i = 0; i < provider.potholeImages.length; i++) {
+        potholeImages.add(
+          await MultipartFile.fromFile(
+            provider.potholeImages[i].path,
+            filename: "pothole_$i.png",
+            contentType: DioMediaType("image", "png"),
+          ),
+        );
+      }
+
+      String coordinatesJson = jsonEncode(provider.coordinates);
+      FormData formData = FormData.fromMap({
+        "potholeImages": potholeImages,
+        "coordinates": coordinatesJson,
+        "severity": severity,
+        "area_details": _areaController.text,
+        "landmark": _landmarkController.text,
+        "remarks": _remarkController.text,
+      });
+
+      bool success = await provider.createPothole(formData);
+      
+      if (success) {
+        _showReportDialog(context, true, "Your pothole report has been submitted successfully!");
+      } else {
+        _showReportDialog(context, false, "Failed to submit report. This location may not be operated by PWD or there was a network error.");
+      }
+    } catch (e) {
+      _showReportDialog(context, false, "An error occurred while submitting the report.");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
   }
 
-  void _showReportDialog(BuildContext context) {
+  void _showReportDialog(BuildContext context, bool success, String message) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Report Submitted'),
-          content: Text('Your pothole report has been submitted successfully!'),
+          title: Text(success ? 'Success' : 'Error'),
+          content: Text(message),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                Navigator.of(context).popUntil((route) => route.isFirst);
+                if (success) {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                }
               },
               child: Text('OK'),
             ),

@@ -62,275 +62,353 @@ class _DashboardState extends State<Dashboard> {
     return Consumer<HomeProvider>(
       builder: (context, store, child) {
         return Scaffold(
-          appBar: AppBar(
-            backgroundColor: const Color(
-              0xFF2E7D6F,
-            ), // green shade like your image
-            elevation: 0,
-            automaticallyImplyLeading: false,
-            toolbarHeight:
-                80, // Increased height for proper circular profile image
-            flexibleSpace: Padding(
-              padding: const EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: 65,
-                bottom: 15,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Profile Image
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(25), // Same as radius
-                    child:
-                        store.loading
-                            ? CircularProgressIndicator()
-                            : Image.network(
-                              "${Constants.baseUrl}${store.userdetails?.profilePhotoLink}",
-                              width: 50,
-                              height: 50,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Image.asset(
-                                  Assets.profile,
-                                  fit: BoxFit.cover,
-                                );
-                              },
-                            ),
+          backgroundColor: AppPallet.backgroundColor,
+          body: Column(
+            children: [
+              // Custom Header
+              Container(
+                padding: const EdgeInsets.only(
+                  top: 60,
+                  left: 20,
+                  right: 20,
+                  bottom: 24,
+                ),
+                decoration: const BoxDecoration(
+                  color: AppPallet.primaryColor,
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(30),
+                    bottomRight: Radius.circular(30),
                   ),
-                  const SizedBox(width: 12),
-
-                  // Name + Address
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            store.userdetails?.name ?? "",
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(30),
+                        child:
+                            store.loading
+                                ? const SizedBox(
+                                  width: 50,
+                                  height: 50,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                  ),
+                                )
+                                : Image.network(
+                                  "${Constants.baseUrl}${store.userdetails?.profilePhotoLink}",
+                                  width: 50,
+                                  height: 50,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Image.asset(
+                                      Assets.profile,
+                                      width: 50,
+                                      height: 50,
+                                      fit: BoxFit.cover,
+                                    );
+                                  },
+                                ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Welcome back,",
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: 14,
+                              color: Colors.white.withOpacity(0.9),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            store.userdetails?.name ?? "User",
+                            style: const TextStyle(
+                              fontSize: 20,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        SizedBox(height: 2),
-                        Flexible(
-                          child: Text(
-                            store.userdetails?.address ?? "",
-                            style: TextStyle(fontSize: 12, color: Colors.white),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                    // Notification Icon could go here
+                  ],
+                ),
               ),
-            ),
-          ),
-          body: Padding(
-            padding: const EdgeInsets.all(10.0),
-            child: Column(
-              children: [
-                // Header Section
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16.0),
+
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.all(20),
                   child: Column(
-                    spacing: 10,
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        "Report Pothole",
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
+                      // Action Card
+                      GestureDetector(
+                        onTap: () async {
+                          final res =
+                              await AppFunctions.captureImageFromCamera();
+                          if (res != null) {
+                            context.push('/scanpothole', extra: res);
+                          }
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          height: 160,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFF8C300), Color(0xFFFFA000)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFF8C300).withOpacity(0.3),
+                                blurRadius: 15,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: Stack(
+                            children: [
+                              Positioned(
+                                right: -20,
+                                bottom: -20,
+                                child: Icon(
+                                  Icons.camera_alt_rounded,
+                                  size: 140,
+                                  color: Colors.white.withOpacity(0.2),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(
+                                        Icons.camera_alt_outlined,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    const Text(
+                                      "Report a Pothole",
+                                      style: TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      "Tap to capture and analyze",
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      const Text("Take photos and submit to report potholes"),
-                      if (capturedPhotos.isNotEmpty)
-                        Text(
-                          "${capturedPhotos.length} photo(s) captured",
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.blue,
-                            fontWeight: FontWeight.w500,
+
+                      const SizedBox(height: 32),
+
+                      // Recent Captures Header
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            "Recent Captures",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppPallet.textPrimary,
+                            ),
+                          ),
+                          if (capturedPhotos.isNotEmpty)
+                            Text(
+                              "${capturedPhotos.length} items",
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppPallet.textSecondary,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Processing Indicator
+                      if (isProcessing)
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Row(
+                            children: const [
+                              SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                              SizedBox(width: 12),
+                              Text("Processing image..."),
+                            ],
                           ),
                         ),
+
+                      // Photos List
+                      if (capturedPhotos.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 40),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.grey.withOpacity(0.1),
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.image_not_supported_outlined,
+                                size: 48,
+                                color: Colors.grey.withOpacity(0.4),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                "No photos captured yet",
+                                style: TextStyle(
+                                  color: Colors.grey.withOpacity(0.6),
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: capturedPhotos.length,
+                          itemBuilder: (context, index) {
+                            final photo = capturedPhotos[index];
+                            final isPothole = photo.result.contains('Pothole');
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.05),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: ListTile(
+                                contentPadding: const EdgeInsets.all(12),
+                                leading: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.file(
+                                    photo.imageFile,
+                                    width: 60,
+                                    height: 60,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                title: Text(
+                                  photo.result,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color:
+                                        isPothole
+                                            ? Colors.red
+                                            : AppPallet.primaryColor,
+                                  ),
+                                ),
+                                subtitle: Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    photo.timestamp.toString().substring(0, 16),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppPallet.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                                trailing: IconButton(
+                                  onPressed: () => _removePhoto(index),
+                                  icon: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withOpacity(0.1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.delete_outline,
+                                      color: Colors.red,
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      const SizedBox(height: 80), // Bottom padding for FAB
                     ],
                   ),
                 ),
-
-                // Action Buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            final res =
-                                await AppFunctions.captureImageFromCamera();
-                            if (res != null) {
-                              context.push('/scanpothole', extra: res);
-                            }
-                          },
-                          icon: Icon(Icons.document_scanner, size: 20),
-                          label: Text(
-                            "Click Here",
-                            style: TextStyle(fontSize: 16),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppPallet.buttonColor,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (capturedPhotos.isNotEmpty)
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Submit functionality to be implemented',
-                                  ),
-                                ),
-                              );
-                            },
-                            icon: Icon(Icons.upload, size: 20),
-                            label: Text(
-                              "Submit Reports",
-                              style: TextStyle(fontSize: 16),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-
-                // Processing Indicator
-                if (isProcessing)
-                  const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Column(
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 8),
-                        Text("Processing image..."),
-                      ],
-                    ),
-                  ),
-
-                // Photos List
-                Expanded(
-                  child:
-                      capturedPhotos.isEmpty
-                          ? const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.photo_camera_outlined,
-                                  size: 64,
-                                  color: Colors.grey,
-                                ),
-                                SizedBox(height: 16),
-                                Text(
-                                  "No photos captured yet",
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                          : ListView.builder(
-                            itemCount: capturedPhotos.length,
-                            itemBuilder: (context, index) {
-                              final photo = capturedPhotos[index];
-                              return Card(
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                child: ListTile(
-                                  leading: ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image.file(
-                                      photo.imageFile,
-                                      width: 60,
-                                      height: 60,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                  title: Text(
-                                    photo.result,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                      color:
-                                          photo.result.contains('Pothole')
-                                              ? Colors.red
-                                              : Colors.green,
-                                    ),
-                                  ),
-                                  subtitle: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        "Captured: ${photo.timestamp.toString().substring(0, 19)}",
-                                      ),
-                                      if (photo.location != null)
-                                        Text(
-                                          "Location: ${photo.location!.latitude.toStringAsFixed(6)}, ${photo.location!.longitude.toStringAsFixed(6)}",
-                                          style: const TextStyle(fontSize: 12),
-                                        )
-                                      else
-                                        const Text(
-                                          "Location: Not available",
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.orange,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  trailing: IconButton(
-                                    onPressed: () => _removePhoto(index),
-                                    icon: const Icon(
-                                      Icons.delete,
-                                      color: Colors.red,
-                                    ),
-                                  ),
-                                  isThreeLine: true,
-                                ),
-                              );
-                            },
-                          ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
+          floatingActionButton:
+              capturedPhotos.isNotEmpty
+                  ? FloatingActionButton.extended(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Submit functionality to be implemented',
+                          ),
+                        ),
+                      );
+                    },
+                    backgroundColor: AppPallet.primaryColor,
+                    icon: const Icon(Icons.upload_rounded),
+                    label: const Text("Submit Reports"),
+                  )
+                  : null,
         );
       },
     );
@@ -349,41 +427,31 @@ class PotholeDetector {
 
   final int inputSize = 640;
   final double confidenceThreshold =
-      0.02; // Consistent threshold for classification and final check
+      0.25; // Threshold for pothole detection (25% confidence minimum)
 
   Future<void> loadModel() async {
     try {
-      print("Loading AI model...");
       _interpreter = await Interpreter.fromAsset(
         'assets/model/best_float32.tflite',
       );
       _labels =
           (await rootBundle.loadString(
             'assets/model/labels.txt',
-          )).split('\n').where((e) => e.trim().isNotEmpty).toList();
-      print("AI Model loaded successfully. Labels: $_labels");
-      print("Model input shape: ${_interpreter.getInputTensors()}");
-      print("Model output shape: ${_interpreter.getOutputTensors()}");
+          )).split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
     } catch (e) {
-      print("Error loading AI model: $e");
       throw Exception("Failed to load AI model: $e");
     }
   }
 
   Future<String> predict(File imageFile) async {
     try {
-      print("Starting prediction...");
       final bytes = await imageFile.readAsBytes();
-      print("Image bytes loaded: ${bytes.length}");
       final raw = img.decodeImage(bytes);
       if (raw == null) {
-        print("Failed to decode image");
         return "Invalid image";
       }
-      print("Image decoded successfully: ${raw.width}x${raw.height}");
 
       final resized = img.copyResize(raw, width: inputSize, height: inputSize);
-      print("Image resized to: ${resized.width}x${resized.height}");
 
       // Build input: shape [1, 640, 640, 3]
       List<List<List<List<double>>>> input = List.generate(
@@ -398,18 +466,14 @@ class PotholeDetector {
           });
         }),
       );
-      print("Input tensor created with shape: [1, $inputSize, $inputSize, 3]");
 
       // Output buffer: shape [1, 5, 8400] for YOLO format [batch, features, anchors]
       final output = List.generate(
         1,
         (_) => List.generate(5, (_) => List.filled(8400, 0.0)),
       );
-      print("Output buffer created with shape: [1, 5, 8400]");
 
-      print("Running model inference...");
       _interpreter.run(input, output);
-      print("Model inference completed");
 
       final results = output[0]; // Shape: [5, 8400]
       double maxConfidence = 0.0;
@@ -419,8 +483,8 @@ class PotholeDetector {
       List<double> confidenceValues = [];
       int highConfidenceCount = 0;
       for (int i = 0; i < 8400; i++) {
-        // YOLO format: [x, y, w, h, confidence, class1, class2, ...]
-        // But our model outputs [x, y, w, h, confidence] where confidence is objectness * class_prob
+        // YOLO format: [x, y, w, h, confidence]
+        // This is a single-class model where confidence represents pothole detection confidence
         final confidence = results[4][i];
         confidenceValues.add(confidence);
 
@@ -431,52 +495,37 @@ class PotholeDetector {
 
         if (confidence > maxConfidence) {
           maxConfidence = confidence;
-          // For this model, use relative confidence - higher values indicate detections
-          // Since the model produces values in range 0.0001-0.13, we use a consistent threshold
-          bestClassIndex =
-              confidence > confidenceThreshold
-                  ? 0
-                  : 1; // 0 = pothole, 1 = no_pothole
         }
       }
-
-      // Debug: Show some sample confidence values
-      print(
-        "Sample confidence values (first 10): ${confidenceValues.take(10)}",
-      );
-      print(
-        "Max confidence in all values: ${confidenceValues.reduce((a, b) => a > b ? a : b)}",
-      );
-      print(
-        "Min confidence in all values: ${confidenceValues.reduce((a, b) => a < b ? a : b)}",
-      );
-      print(
-        "Values above ${confidenceThreshold * 100}% threshold: ${confidenceValues.where((c) => c > confidenceThreshold).length}",
-      );
-
-      print(
-        "Max confidence found: $maxConfidence, Best class index: $bestClassIndex",
-      );
+      
+      // Determine if pothole is detected based on max confidence
+      // If max confidence is above threshold, it's a pothole (class 0)
+      // Otherwise, no pothole detected (class 1)
+      bestClassIndex = maxConfidence >= confidenceThreshold ? 0 : 1;
 
       if (bestClassIndex != -1 && maxConfidence >= confidenceThreshold) {
+        if (bestClassIndex >= _labels.length) {
+          return "No pothole detected";
+        }
+        
         final label = _labels[bestClassIndex];
         final percentage = (maxConfidence * 100).toStringAsFixed(1);
-        print("Prediction result: $label detected (${percentage}%)");
-        return "$label detected (${percentage}%)";
+        final result = "$label detected ($percentage%)";
+        return result;
       } else {
-        print("No detection above threshold");
         return "No pothole detected";
       }
     } catch (e) {
-      print("Error during prediction: $e");
       return "Error processing image";
     }
   }
 
   // New method to run prediction in background isolate
   Future<String> predictInBackground(File imageFile) async {
-    // Use compute to run the prediction in a background isolate
-    return await compute(_predictInBackground, imageFile.path);
+    // Instead of using compute (which creates a new isolate and can't access assets),
+    // just run the prediction on the main isolate but asynchronously
+    // The actual heavy computation is in TFLite which runs natively anyway
+    return await predict(imageFile);
   }
 
   void dispose() {
@@ -493,12 +542,14 @@ Future<String> _predictInBackground(String imagePath) async {
     final interpreter = await Interpreter.fromAsset(
       'assets/model/best_float32.tflite',
     );
+    
     final labelData = await rootBundle.loadString('assets/model/labels.txt');
     final labels =
         labelData.split('\n').where((e) => e.trim().isNotEmpty).toList();
 
     final imageFile = File(imagePath);
     final bytes = await imageFile.readAsBytes();
+    
     final raw = img.decodeImage(bytes);
     if (raw == null) {
       return "Invalid image";
@@ -533,29 +584,27 @@ Future<String> _predictInBackground(String imagePath) async {
     final results = output[0]; // Shape: [5, 8400]
     double maxConfidence = 0.0;
     int bestClassIndex = -1;
-    final confidenceThreshold = 0.02;
+    final confidenceThreshold = 0.25; // 25% confidence minimum
 
-    // Parse YOLO outputs
+    // Parse YOLO outputs - find maximum confidence
     for (int i = 0; i < 8400; i++) {
       final confidence = results[4][i];
       if (confidence > maxConfidence) {
         maxConfidence = confidence;
-        bestClassIndex =
-            confidence > confidenceThreshold
-                ? 0
-                : 1; // 0 = pothole, 1 = no_pothole
       }
     }
+    
+    // Determine class based on confidence threshold
+    bestClassIndex = maxConfidence >= confidenceThreshold ? 0 : 1;
 
-    if (bestClassIndex != -1 && maxConfidence >= confidenceThreshold) {
-      // Note: We can't access _labels here in the isolate, so we'll use hardcoded values
-      final label = bestClassIndex == 0 ? "pothole" : "no_pothole";
+    if (bestClassIndex == 0 && maxConfidence >= confidenceThreshold) {
+      // Pothole detected
       final percentage = (maxConfidence * 100).toStringAsFixed(1);
-      return "$label detected (${percentage}%)";
+      return "pothole detected ($percentage%)";
     } else {
       return "No pothole detected";
     }
-  } catch (e) {
-    return "Error processing image";
+  } catch (e, stackTrace) {
+    return "Error processing image: $e";
   }
 }

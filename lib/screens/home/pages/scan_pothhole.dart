@@ -46,9 +46,8 @@ class _ScanPothholeState extends State<ScanPothhole>
   Future<void> _initializeDetector() async {
     try {
       await detector.loadModel();
-      print("Detector initialized successfully");
     } catch (e) {
-      print("Failed to initialize detector: $e");
+      // Model loading failed
     }
   }
 
@@ -56,22 +55,25 @@ class _ScanPothholeState extends State<ScanPothhole>
     Future.delayed(const Duration(seconds: 3), () async {
       if (mounted) {
         try {
-          print("Starting AI processing...");
           // Use the detector instance that was already initialized
           // Run prediction in background to prevent UI freezing
           final result = await detector.predictInBackground(widget.file);
-          print("AI Prediction result: $result");
 
           // Navigate to appropriate screen based on detection result
-          if (result.contains("pothole detected") && !result.contains("No pothole detected")) {
-            // Pothole detected - navigate to success screen
+          // Check for no pothole first
+          if (result.toLowerCase().contains("no") || result.contains("no_pothole")) {
+            context.pushReplacement('/noPotholeDetected', extra: widget.file);
+          } 
+          // Check for pothole detection (either "pothole detected" or just "pothole")
+          else if (result.contains("pothole detected") || 
+                   (result.startsWith("pothole") && !result.contains("no"))) {
             context.pushReplacement('/potholeDetected', extra: widget.file);
-          } else {
-            // No pothole detected - navigate to info screen
+          } 
+          // Fallback
+          else {
             context.pushReplacement('/noPotholeDetected', extra: widget.file);
           }
         } catch (e) {
-          print("Error during AI prediction: $e");
           AppFunctions.showCustomSnackBar(
             context,
             "Failed to analyze image. Please try again.",
