@@ -454,6 +454,18 @@ class _ReportState extends State<Report> {
     return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period';
   }
 
+  String _getFullImageUrl(String imageUrl) {
+    // If the URL is already complete, return it as is
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return imageUrl;
+    }
+    // Otherwise, prepend the base URL
+    const String baseUrl = 'https://rudra.assam.gov.in';
+    // Remove leading slash if present to avoid double slashes
+    final String cleanPath = imageUrl.startsWith('/') ? imageUrl : '/$imageUrl';
+    return '$baseUrl$cleanPath';
+  }
+
   void _showImageViewer(BuildContext context, Data report) {
     if (report.images == null || report.images!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -509,24 +521,48 @@ class _ReportState extends State<Report> {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
                           child: Image.network(
-                            report.images![index].imageUrl ?? '',
+                            _getFullImageUrl(
+                              report.images![index].imageUrl ?? '',
+                            ),
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) {
                               return Container(
                                 color: Colors.grey[200],
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.image_not_supported,
-                                    size: 50,
-                                    color: Colors.grey,
+                                child: Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(
+                                        Icons.image_not_supported,
+                                        size: 50,
+                                        color: Colors.grey,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Failed to load image',
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               );
                             },
                             loadingBuilder: (context, child, loadingProgress) {
                               if (loadingProgress == null) return child;
-                              return const Center(
-                                child: CircularProgressIndicator(),
+                              return Center(
+                                child: CircularProgressIndicator(
+                                  value:
+                                      loadingProgress.expectedTotalBytes != null
+                                          ? loadingProgress
+                                                  .cumulativeBytesLoaded /
+                                              loadingProgress
+                                                  .expectedTotalBytes!
+                                          : null,
+                                  color: AppPallet.primaryColor,
+                                ),
                               );
                             },
                           ),

@@ -17,19 +17,41 @@ class HomeProvider extends ChangeNotifier {
   List<Map<String, double>> coordinates = [];
   bool loading = true;
 
-  Future<bool> createPothole(FormData formData) async {
+  Future<Map<String, dynamic>> createPothole(FormData formData) async {
     try {
       final response = await apiService.post(
         url: "/pothole/create",
         data: formData,
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
-        return true;
+        return {'success': true, 'message': 'Report submitted successfully'};
       }
-      return false;
+      return {'success': false, 'message': 'Failed to submit report'};
+    } on DioException catch (e) {
+      // Handle specific error responses from server
+      if (e.response != null && e.response?.statusCode == 400) {
+        try {
+          final errorData = e.response?.data;
+          if (errorData is Map && errorData['message'] != null) {
+            // Extract the server error message
+            String message = errorData['message'];
+            String? existingCaseNo = errorData['data']?['existing_case_no'];
+
+            if (existingCaseNo != null) {
+              message += '\n\nExisting Case: $existingCaseNo';
+            }
+
+            return {'success': false, 'message': message};
+          }
+        } catch (_) {}
+      }
+      return {
+        'success': false,
+        'message': 'Network error. Please check your connection and try again.',
+      };
     } catch (e) {
-      return false;
-    } finally {}
+      return {'success': false, 'message': 'An unexpected error occurred'};
+    }
   }
 
   Future<void> addCurrentCordinate() async {

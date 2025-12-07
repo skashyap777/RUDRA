@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rudra/config/theme/app_pallet.dart';
 import 'package:rudra/config/utils/app_functions.dart';
@@ -152,7 +151,7 @@ class _DashboardState extends State<Dashboard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Action Card
+                      // Camera Card (Full Width - Gallery functionality removed)
                       GestureDetector(
                         onTap: () async {
                           final res =
@@ -162,8 +161,7 @@ class _DashboardState extends State<Dashboard> {
                           }
                         },
                         child: Container(
-                          width: double.infinity,
-                          height: 160,
+                          height: 240,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
                               colors: [Color(0xFFF8C300), Color(0xFFFFA000)],
@@ -173,53 +171,57 @@ class _DashboardState extends State<Dashboard> {
                             borderRadius: BorderRadius.circular(24),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFFF8C300).withOpacity(0.3),
-                                blurRadius: 15,
-                                offset: const Offset(0, 8),
+                                color: const Color(0xFFF8C300).withOpacity(0.4),
+                                blurRadius: 20,
+                                offset: const Offset(0, 10),
                               ),
                             ],
                           ),
                           child: Stack(
                             children: [
+                              // Background decoration icon
                               Positioned(
-                                right: -20,
-                                bottom: -20,
+                                right: -30,
+                                bottom: -30,
                                 child: Icon(
                                   Icons.camera_alt_rounded,
-                                  size: 140,
-                                  color: Colors.white.withOpacity(0.2),
+                                  size: 180,
+                                  color: Colors.white.withOpacity(0.15),
                                 ),
                               ),
-                              Padding(
-                                padding: const EdgeInsets.all(24),
+                              // Main content - centered
+                              Center(
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
+                                    // Large camera icon
                                     Container(
-                                      padding: const EdgeInsets.all(10),
+                                      padding: const EdgeInsets.all(20),
                                       decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(12),
+                                        color: Colors.white.withOpacity(0.25),
+                                        shape: BoxShape.circle,
                                       ),
                                       child: const Icon(
-                                        Icons.camera_alt_outlined,
+                                        Icons.camera_alt_rounded,
                                         color: Colors.white,
-                                        size: 24,
+                                        size: 64,
                                       ),
                                     ),
-                                    const Spacer(),
+                                    const SizedBox(height: 20),
+                                    // Title
                                     const Text(
-                                      "Report a Pothole",
+                                      "Capture Pothole",
                                       style: TextStyle(
-                                        fontSize: 22,
+                                        fontSize: 24,
                                         fontWeight: FontWeight.bold,
                                         color: Colors.white,
+                                        letterSpacing: 0.5,
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
+                                    const SizedBox(height: 8),
+                                    // Subtitle
                                     const Text(
-                                      "Tap to capture and analyze",
+                                      "Tap to open camera",
                                       style: TextStyle(
                                         fontSize: 14,
                                         color: Colors.white,
@@ -427,7 +429,9 @@ class PotholeDetector {
 
   final int inputSize = 640;
   final double confidenceThreshold =
-      0.25; // Threshold for pothole detection (25% confidence minimum)
+      0.50; // Threshold for pothole detection (50% confidence minimum)
+  final int minDetections =
+      3; // Minimum number of high-confidence detections required
 
   Future<void> loadModel() async {
     try {
@@ -435,9 +439,11 @@ class PotholeDetector {
         'assets/model/best_float32.tflite',
       );
       _labels =
-          (await rootBundle.loadString(
-            'assets/model/labels.txt',
-          )).split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+          (await rootBundle.loadString('assets/model/labels.txt'))
+              .split('\n')
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty)
+              .toList();
     } catch (e) {
       throw Exception("Failed to load AI model: $e");
     }
@@ -477,7 +483,6 @@ class PotholeDetector {
 
       final results = output[0]; // Shape: [5, 8400]
       double maxConfidence = 0.0;
-      int bestClassIndex = -1;
 
       // Parse YOLO outputs
       List<double> confidenceValues = [];
@@ -497,18 +502,17 @@ class PotholeDetector {
           maxConfidence = confidence;
         }
       }
-      
-      // Determine if pothole is detected based on max confidence
-      // If max confidence is above threshold, it's a pothole (class 0)
-      // Otherwise, no pothole detected (class 1)
-      bestClassIndex = maxConfidence >= confidenceThreshold ? 0 : 1;
 
-      if (bestClassIndex != -1 && maxConfidence >= confidenceThreshold) {
-        if (bestClassIndex >= _labels.length) {
-          return "No pothole detected";
-        }
-        
-        final label = _labels[bestClassIndex];
+      // Determine if pothole is detected using dual criteria to reduce false positives:
+      // 1. Maximum confidence must be >= 50% (high confidence threshold)
+      // 2. At least 3 anchor points must have high confidence (multiple detections)
+      // This approach ensures we only classify as pothole when the model is very confident
+      bool isPotholeDetected =
+          maxConfidence >= confidenceThreshold &&
+          highConfidenceCount >= minDetections;
+
+      if (isPotholeDetected) {
+        final label = _labels[0]; // "pothole"
         final percentage = (maxConfidence * 100).toStringAsFixed(1);
         final result = "$label detected ($percentage%)";
         return result;
@@ -542,14 +546,14 @@ Future<String> _predictInBackground(String imagePath) async {
     final interpreter = await Interpreter.fromAsset(
       'assets/model/best_float32.tflite',
     );
-    
+
     final labelData = await rootBundle.loadString('assets/model/labels.txt');
     final labels =
         labelData.split('\n').where((e) => e.trim().isNotEmpty).toList();
 
     final imageFile = File(imagePath);
     final bytes = await imageFile.readAsBytes();
-    
+
     final raw = img.decodeImage(bytes);
     if (raw == null) {
       return "Invalid image";
@@ -583,21 +587,27 @@ Future<String> _predictInBackground(String imagePath) async {
 
     final results = output[0]; // Shape: [5, 8400]
     double maxConfidence = 0.0;
-    int bestClassIndex = -1;
-    final confidenceThreshold = 0.25; // 25% confidence minimum
+    int highConfidenceCount = 0;
+    final confidenceThreshold = 0.50; // 50% confidence minimum
+    final minDetections = 3; // Minimum number of high-confidence detections
 
-    // Parse YOLO outputs - find maximum confidence
+    // Parse YOLO outputs - find maximum confidence and count high-confidence detections
     for (int i = 0; i < 8400; i++) {
       final confidence = results[4][i];
+      if (confidence > confidenceThreshold) {
+        highConfidenceCount++;
+      }
       if (confidence > maxConfidence) {
         maxConfidence = confidence;
       }
     }
-    
-    // Determine class based on confidence threshold
-    bestClassIndex = maxConfidence >= confidenceThreshold ? 0 : 1;
 
-    if (bestClassIndex == 0 && maxConfidence >= confidenceThreshold) {
+    // Determine if pothole is detected using dual criteria
+    bool isPotholeDetected =
+        maxConfidence >= confidenceThreshold &&
+        highConfidenceCount >= minDetections;
+
+    if (isPotholeDetected) {
       // Pothole detected
       final percentage = (maxConfidence * 100).toStringAsFixed(1);
       return "pothole detected ($percentage%)";

@@ -7,8 +7,12 @@ Future<Dio> createBaseDio() async {
   final String baseUrl = ApiConstants.baseUrl;
   final BaseOptions baseOptions = BaseOptions(
     baseUrl: baseUrl,
-    connectTimeout: const Duration(milliseconds: 30000),
-    receiveTimeout: const Duration(milliseconds: 30000),
+    connectTimeout: const Duration(
+      seconds: 60,
+    ), // Increased for large file uploads
+    receiveTimeout: const Duration(
+      seconds: 120,
+    ), // 2 minutes for image processing
   );
 
   final Dio dio = Dio(baseOptions);
@@ -24,8 +28,12 @@ class HTTP {
     _dioClient = Dio(
       BaseOptions(
         baseUrl: ApiConstants.baseUrl,
-        connectTimeout: const Duration(milliseconds: 30000),
-        receiveTimeout: const Duration(milliseconds: 30000),
+        connectTimeout: const Duration(
+          seconds: 60,
+        ), // Increased for large file uploads
+        receiveTimeout: const Duration(
+          seconds: 120,
+        ), // 2 minutes for image processing
       ),
     );
     _dioClient.interceptors.addAll([LogInterceptor(responseBody: true)]);

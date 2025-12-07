@@ -321,9 +321,12 @@ class _AddPotholeState extends State<AddPothole> {
                   child: Container(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {
-                        submitReport();
-                      },
+                      onPressed:
+                          _isSubmitting
+                              ? null
+                              : () {
+                                submitReport();
+                              },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Color(0xFFFFC107),
                         foregroundColor: Colors.black87,
@@ -332,13 +335,25 @@ class _AddPotholeState extends State<AddPothole> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: Text(
-                        'Submit Report',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                      child:
+                          _isSubmitting
+                              ? SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.black87,
+                                  ),
+                                ),
+                              )
+                              : Text(
+                                'Submit Report',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                     ),
                   ),
                 ),
@@ -433,7 +448,7 @@ class _AddPotholeState extends State<AddPothole> {
 
   void submitReport() async {
     if (_isSubmitting) return; // Prevent duplicate submissions
-    
+
     setState(() {
       _isSubmitting = true;
     });
@@ -442,13 +457,30 @@ class _AddPotholeState extends State<AddPothole> {
       final provider = Provider.of<HomeProvider>(context, listen: false);
       List<MultipartFile> potholeImages = [];
       for (var i = 0; i < provider.potholeImages.length; i++) {
-        potholeImages.add(
-          await MultipartFile.fromFile(
-            provider.potholeImages[i].path,
-            filename: "pothole_$i.png",
-            contentType: DioMediaType("image", "png"),
-          ),
+        // Compress image before uploading to reduce file size and upload time
+        final compressedImage = await provider.compressImage(
+          provider.potholeImages[i],
         );
+
+        if (compressedImage != null) {
+          potholeImages.add(
+            await MultipartFile.fromFile(
+              compressedImage.path,
+              filename:
+                  "pothole_$i.jpg", // Changed to .jpg since we're compressing to JPEG
+              contentType: DioMediaType("image", "jpeg"),
+            ),
+          );
+        } else {
+          // Fallback to original image if compression fails
+          potholeImages.add(
+            await MultipartFile.fromFile(
+              provider.potholeImages[i].path,
+              filename: "pothole_$i.png",
+              contentType: DioMediaType("image", "png"),
+            ),
+          );
+        }
       }
 
       String coordinatesJson = jsonEncode(provider.coordinates);
@@ -461,15 +493,28 @@ class _AddPotholeState extends State<AddPothole> {
         "remarks": _remarkController.text,
       });
 
-      bool success = await provider.createPothole(formData);
-      
-      if (success) {
-        _showReportDialog(context, true, "Your pothole report has been submitted successfully!");
+      Map<String, dynamic> result = await provider.createPothole(formData);
+
+      if (result['success']) {
+        _showReportDialog(
+          context,
+          true,
+          result['message'] ??
+              "Your pothole report has been submitted successfully!",
+        );
       } else {
-        _showReportDialog(context, false, "Failed to submit report. This location may not be operated by PWD or there was a network error.");
+        _showReportDialog(
+          context,
+          false,
+          result['message'] ?? "Failed to submit report. Please try again.",
+        );
       }
     } catch (e) {
-      _showReportDialog(context, false, "An error occurred while submitting the report.");
+      _showReportDialog(
+        context,
+        false,
+        "An error occurred while submitting the report.",
+      );
     } finally {
       if (mounted) {
         setState(() {

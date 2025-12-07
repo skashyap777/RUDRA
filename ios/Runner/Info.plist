@@ -50,6 +50,13 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app needs location access to detect potholes at your current location.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app needs location access to detect potholes and track your reports.</string>
+	
+	<!-- Camera permission for image capture (Gallery access removed - camera only) -->
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs camera access to capture photos of potholes for reporting.</string>
+	
+	<!-- Notifications permission -->
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>This app needs notification permissions to send you updates about pothole reports.</string>
 
@@ -59,14 +66,27 @@
 	<key>io.flutter.embedded_views_preview</key>
 	<true/>
 
-	<!-- App Transport Security for API domain -->
+	<!-- App Transport Security for API domains -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
 		<key>NSExceptionDomains</key>
 		<dict>
+			<!-- Development/Mock API domain -->
 			<key>pwd.mockify.org</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSTemporaryExceptionAllowsInsecureHTTPLoads</key>
+				<false/>
+				<key>NSTemporaryExceptionMinimumTLSVersion</key>
+				<string>TLSv1.2</string>
+				<key>NSTemporaryExceptionRequiresForwardSecrecy</key>
+				<false/>
+			</dict>
+			<!-- Production API domain -->
+			<key>rudra.assam.gov.in</key>
 			<dict>
 				<key>NSIncludesSubdomains</key>
 				<true/>

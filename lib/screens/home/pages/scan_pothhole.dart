@@ -37,7 +37,9 @@ class _ScanPothholeState extends State<ScanPothhole>
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
     // Start animation
-    _controller.repeat(reverse: true); // Changed to true to make it bounce back and forth
+    _controller.repeat(
+      reverse: true,
+    ); // Changed to true to make it bounce back and forth
 
     // Start processing after initialization
     _startProcessing();
@@ -46,8 +48,9 @@ class _ScanPothholeState extends State<ScanPothhole>
   Future<void> _initializeDetector() async {
     try {
       await detector.loadModel();
+      print("Detector initialized successfully");
     } catch (e) {
-      // Model loading failed
+      print("Failed to initialize detector: $e");
     }
   }
 
@@ -55,25 +58,29 @@ class _ScanPothholeState extends State<ScanPothhole>
     Future.delayed(const Duration(seconds: 3), () async {
       if (mounted) {
         try {
-          // Use the detector instance that was already initialized
-          // Run prediction in background to prevent UI freezing
-          final result = await detector.predictInBackground(widget.file);
+          print("🚀 [DEBUG] Starting AI processing...");
+          // Use regular predict() instead of background to see detailed logs
+          final result = await detector.predict(widget.file);
+          print("✅ [DEBUG] AI Prediction result: $result");
 
           // Navigate to appropriate screen based on detection result
-          // Check for no pothole first
-          if (result.toLowerCase().contains("no") || result.contains("no_pothole")) {
-            context.pushReplacement('/noPotholeDetected', extra: widget.file);
-          } 
-          // Check for pothole detection (either "pothole detected" or just "pothole")
-          else if (result.contains("pothole detected") || 
-                   (result.startsWith("pothole") && !result.contains("no"))) {
+          // Check if result contains "pothole" but NOT "No pothole"
+          final isPotholeDetected =
+              result.toLowerCase().contains("pothole") &&
+              !result.toLowerCase().contains("no pothole");
+
+          if (isPotholeDetected) {
+            // Pothole detected - navigate to success screen
+            print("🎯 [DEBUG] Navigating to pothole detected screen");
             context.pushReplacement('/potholeDetected', extra: widget.file);
-          } 
-          // Fallback
-          else {
+          } else {
+            // No pothole detected - navigate to info screen
+            print("ℹ️ [DEBUG] Navigating to no pothole detected screen");
             context.pushReplacement('/noPotholeDetected', extra: widget.file);
           }
-        } catch (e) {
+        } catch (e, stackTrace) {
+          print("❌ [DEBUG] Error during AI prediction: $e");
+          print("📍 [DEBUG] Stack trace: $stackTrace");
           AppFunctions.showCustomSnackBar(
             context,
             "Failed to analyze image. Please try again.",
