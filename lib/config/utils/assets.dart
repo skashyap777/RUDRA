@@ -16,5 +16,5 @@ class Assets {
 }
 
 class Constants {
-  static String baseUrl = "https://pwd.mockify.org";
+  static String baseUrl = "https://rudra.assam.gov.in";
 }
