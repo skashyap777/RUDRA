@@ -31,17 +31,31 @@ class ProfileProvider extends ChangeNotifier {
   }
 
   Future<bool> updateProfilePhoto(File file) async {
+    // Determine the correct content type based on file extension
+    String extension = file.path.split(".").last.toLowerCase();
+    String imageType = "jpeg"; // Default to jpeg
+    if (extension == "png") {
+      imageType = "png";
+    } else if (extension == "gif") {
+      imageType = "gif";
+    } else if (extension == "webp") {
+      imageType = "webp";
+    }
+    
+    // Get filename - handle both iOS and Android path separators
+    String filename = file.path.split(Platform.pathSeparator).last;
+    
     FormData formData = FormData.fromMap({
       "profile_photo": await MultipartFile.fromFile(
-        file.path, // <-- local path
-        filename: file.path.split("/").last,
-        contentType: DioMediaType("image", "png"),
+        file.path,
+        filename: filename,
+        contentType: DioMediaType("image", imageType),
       ),
     });
     try {
-      final response = await apiService.patch(
+      final response = await apiService.patchMultipart(
         url: "/profile/update-photo",
-        data: formData,
+        formData: formData,
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         // Refresh profile data after successful update
@@ -50,6 +64,7 @@ class ProfileProvider extends ChangeNotifier {
       }
       return false;
     } catch (e) {
+      debugPrint("Error updating profile photo: $e");
       return false;
     } finally {
       notifyListeners();

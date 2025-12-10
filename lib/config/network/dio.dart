@@ -129,6 +129,33 @@ class HTTP {
     );
   }
 
+  Future<Response> patchMultipart({
+    required String url,
+    required FormData formData,
+    Map<String, dynamic>? queryParameters,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final token = await TokenHandler.getString("token");
+
+    final options = Options(
+      headers: {
+        'Accept': '*/*',
+        "Authorization": "Bearer $token",
+        // DO NOT set Content-Type here — Dio sets it automatically for multipart/form-data
+      },
+    );
+
+    return await _dioClient.patch(
+      url,
+      data: formData,
+      queryParameters: queryParameters,
+      options: options,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+  }
+
   Future<Response> put({
     required String url,
     dynamic data,
