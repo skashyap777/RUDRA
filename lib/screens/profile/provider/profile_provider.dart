@@ -31,40 +31,47 @@ class ProfileProvider extends ChangeNotifier {
   }
 
   Future<bool> updateProfilePhoto(File file) async {
-    // Determine the correct content type based on file extension
-    String extension = file.path.split(".").last.toLowerCase();
-    String imageType = "jpeg"; // Default to jpeg
-    if (extension == "png") {
-      imageType = "png";
-    } else if (extension == "gif") {
-      imageType = "gif";
-    } else if (extension == "webp") {
-      imageType = "webp";
-    }
-    
-    // Get filename - handle both iOS and Android path separators
-    String filename = file.path.split(Platform.pathSeparator).last;
-    
-    FormData formData = FormData.fromMap({
-      "profile_photo": await MultipartFile.fromFile(
-        file.path,
-        filename: filename,
-        contentType: DioMediaType("image", imageType),
-      ),
-    });
     try {
+      if (!await file.exists()) {
+        return false;
+      }
+
+      // Determine the correct content type based on file extension
+      String extension = file.path.split(".").last.toLowerCase();
+      String imageType = "jpeg";
+      if (extension == "png") {
+        imageType = "png";
+      } else if (extension == "gif") {
+        imageType = "gif";
+      } else if (extension == "webp") {
+        imageType = "webp";
+      }
+
+      // Get filename - use simple split for cross-platform compatibility
+      String filename = file.path.split("/").last;
+      if (filename.contains("\\")) {
+        filename = filename.split("\\").last;
+      }
+
+      FormData formData = FormData.fromMap({
+        "profile_photo": await MultipartFile.fromFile(
+          file.path,
+          filename: filename,
+          contentType: DioMediaType("image", imageType),
+        ),
+      });
+
       final response = await apiService.patchMultipart(
         url: "/profile/update-photo",
         formData: formData,
       );
+
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // Refresh profile data after successful update
         await getProfileData();
         return true;
       }
       return false;
     } catch (e) {
-      debugPrint("Error updating profile photo: $e");
       return false;
     } finally {
       notifyListeners();

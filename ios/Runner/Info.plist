@@ -52,9 +52,13 @@
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>This app needs location access to detect potholes and track your reports.</string>
 	
-	<!-- Camera permission for image capture (Gallery access removed - camera only) -->
+	<!-- Camera permission for image capture -->
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs camera access to capture photos of potholes for reporting.</string>
+	
+	<!-- Photo Library permission for selecting images -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs photo library access to select profile photos and pothole images.</string>
 	
 	<!-- Notifications permission -->
 	<key>NSUserNotificationsUsageDescription</key>
