@@ -473,46 +473,97 @@ class PotholeDetector {
         }),
       );
 
-      // Output buffer: shape [1, 5, 8400] for YOLO format [batch, features, anchors]
-      final output = List.generate(
-        1,
-        (_) => List.generate(5, (_) => List.filled(8400, 0.0)),
-      );
-
-      _interpreter.run(input, output);
-
-      final results = output[0]; // Shape: [5, 8400]
+      // Get output tensor shape to handle both Android [1, 5, 8400] and iOS [1, 8400, 5] formats
+      final outputTensors = _interpreter.getOutputTensors();
+      final outputShape = outputTensors[0].shape;
+      
       double maxConfidence = 0.0;
-
-      // Parse YOLO outputs
-      List<double> confidenceValues = [];
       int highConfidenceCount = 0;
-      for (int i = 0; i < 8400; i++) {
-        // YOLO format: [x, y, w, h, confidence]
-        // This is a single-class model where confidence represents pothole detection confidence
-        final confidence = results[4][i];
-        confidenceValues.add(confidence);
 
-        // Count high confidence detections
-        if (confidence > confidenceThreshold) {
-          highConfidenceCount++;
+      // Check if output is [1, 5, 8400] (Android) or [1, 8400, 5] (iOS)
+      if (outputShape.length == 3 && outputShape[1] == 5 && outputShape[2] == 8400) {
+        // Android format: [1, 5, 8400]
+        final output = List.generate(
+          1,
+          (_) => List.generate(5, (_) => List.filled(8400, 0.0)),
+        );
+        _interpreter.run(input, output);
+        
+        final results = output[0];
+        for (int i = 0; i < 8400; i++) {
+          final confidence = results[4][i];
+          if (confidence > confidenceThreshold) {
+            highConfidenceCount++;
+          }
+          if (confidence > maxConfidence) {
+            maxConfidence = confidence;
+          }
         }
-
-        if (confidence > maxConfidence) {
-          maxConfidence = confidence;
+      } else if (outputShape.length == 3 && outputShape[1] == 8400 && outputShape[2] == 5) {
+        // iOS format: [1, 8400, 5]
+        final output = List.generate(
+          1,
+          (_) => List.generate(8400, (_) => List.filled(5, 0.0)),
+        );
+        _interpreter.run(input, output);
+        
+        final results = output[0];
+        for (int i = 0; i < 8400; i++) {
+          final confidence = results[i][4]; // confidence is at index 4 of each detection
+          if (confidence > confidenceThreshold) {
+            highConfidenceCount++;
+          }
+          if (confidence > maxConfidence) {
+            maxConfidence = confidence;
+          }
+        }
+      } else {
+        // Fallback: try both formats
+        try {
+          final output = List.generate(
+            1,
+            (_) => List.generate(5, (_) => List.filled(8400, 0.0)),
+          );
+          _interpreter.run(input, output);
+          
+          final results = output[0];
+          for (int i = 0; i < 8400; i++) {
+            final confidence = results[4][i];
+            if (confidence > confidenceThreshold) {
+              highConfidenceCount++;
+            }
+            if (confidence > maxConfidence) {
+              maxConfidence = confidence;
+            }
+          }
+        } catch (_) {
+          // Try transposed format
+          final output = List.generate(
+            1,
+            (_) => List.generate(8400, (_) => List.filled(5, 0.0)),
+          );
+          _interpreter.run(input, output);
+          
+          final results = output[0];
+          for (int i = 0; i < 8400; i++) {
+            final confidence = results[i][4];
+            if (confidence > confidenceThreshold) {
+              highConfidenceCount++;
+            }
+            if (confidence > maxConfidence) {
+              maxConfidence = confidence;
+            }
+          }
         }
       }
 
-      // Determine if pothole is detected using dual criteria to reduce false positives:
-      // 1. Maximum confidence must be >= 50% (high confidence threshold)
-      // 2. At least 3 anchor points must have high confidence (multiple detections)
-      // This approach ensures we only classify as pothole when the model is very confident
+      // Determine if pothole is detected using dual criteria
       bool isPotholeDetected =
           maxConfidence >= confidenceThreshold &&
           highConfidenceCount >= minDetections;
 
       if (isPotholeDetected) {
-        final label = _labels[0]; // "pothole"
+        final label = _labels[0];
         final percentage = (maxConfidence * 100).toStringAsFixed(1);
         final result = "$label detected ($percentage%)";
         return result;
@@ -537,84 +588,4 @@ class PotholeDetector {
   }
 }
 
-// Top-level function for background processing
-Future<String> _predictInBackground(String imagePath) async {
-  // This function runs in a background isolate
-  // We need to re-initialize the model in the isolate
-  try {
-    // Load model in isolate
-    final interpreter = await Interpreter.fromAsset(
-      'assets/model/best_float32.tflite',
-    );
 
-    final labelData = await rootBundle.loadString('assets/model/labels.txt');
-    final labels =
-        labelData.split('\n').where((e) => e.trim().isNotEmpty).toList();
-
-    final imageFile = File(imagePath);
-    final bytes = await imageFile.readAsBytes();
-
-    final raw = img.decodeImage(bytes);
-    if (raw == null) {
-      return "Invalid image";
-    }
-
-    final inputSize = 640;
-    final resized = img.copyResize(raw, width: inputSize, height: inputSize);
-
-    // Build input: shape [1, 640, 640, 3]
-    List<List<List<List<double>>>> input = List.generate(
-      1,
-      (_) => List.generate(inputSize, (y) {
-        return List.generate(inputSize, (x) {
-          final pixel = resized.getPixel(x, y);
-          final r = pixel.r / 255.0;
-          final g = pixel.g / 255.0;
-          final b = pixel.b / 255.0;
-          return [r, g, b];
-        });
-      }),
-    );
-
-    // Output buffer: shape [1, 5, 8400] for YOLO format [batch, features, anchors]
-    final output = List.generate(
-      1,
-      (_) => List.generate(5, (_) => List.filled(8400, 0.0)),
-    );
-
-    interpreter.run(input, output);
-    interpreter.close();
-
-    final results = output[0]; // Shape: [5, 8400]
-    double maxConfidence = 0.0;
-    int highConfidenceCount = 0;
-    final confidenceThreshold = 0.50; // 50% confidence minimum
-    final minDetections = 3; // Minimum number of high-confidence detections
-
-    // Parse YOLO outputs - find maximum confidence and count high-confidence detections
-    for (int i = 0; i < 8400; i++) {
-      final confidence = results[4][i];
-      if (confidence > confidenceThreshold) {
-        highConfidenceCount++;
-      }
-      if (confidence > maxConfidence) {
-        maxConfidence = confidence;
-      }
-    }
-
-    // Determine if pothole is detected using dual criteria
-    bool isPotholeDetected =
-        maxConfidence >= confidenceThreshold &&
-        highConfidenceCount >= minDetections;
-
-    if (isPotholeDetected) {
-      // Pothole detected
-      final percentage = (maxConfidence * 100).toStringAsFixed(1);
-      return "pothole detected ($percentage%)";
-    } else {
-      return "No pothole detected";
-    }
-  } catch (e, stackTrace) {
-    return "Error processing image: $e";
-  }
-}
