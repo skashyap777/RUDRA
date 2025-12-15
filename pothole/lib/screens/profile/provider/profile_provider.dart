@@ -3,9 +3,9 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:rudra/config/network/dio.dart';
-import 'package:rudra/config/utils/local_storage.dart';
-import 'package:rudra/screens/profile/models/profile_model.dart';
+import 'package:pothole/config/network/dio.dart';
+import 'package:pothole/config/utils/local_storage.dart';
+import 'package:pothole/screens/profile/models/profile_model.dart';
 
 class ProfileProvider extends ChangeNotifier {
   final apiService = HTTP();
@@ -33,7 +33,7 @@ class ProfileProvider extends ChangeNotifier {
   Future<bool> updateProfilePhoto(File file) async {
     FormData formData = FormData.fromMap({
       "profile_photo": await MultipartFile.fromFile(
-        file.path,
+        file.path, // <-- local path
         filename: file.path.split("/").last,
         contentType: DioMediaType("image", "png"),
       ),
@@ -44,7 +44,6 @@ class ProfileProvider extends ChangeNotifier {
         data: formData,
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
-        await getProfileData();
         return true;
       }
       return false;
@@ -59,13 +58,9 @@ class ProfileProvider extends ChangeNotifier {
     try {
       final response = await apiService.patch(
         url: "/profile/update-name",
-        data: {
-          "name": name,
-        }, // Fixed: Use "name" as the key, not the variable name
+        data: {name: name},
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // Refresh profile data after successful update
-        await getProfileData();
         return true;
       }
       return false;

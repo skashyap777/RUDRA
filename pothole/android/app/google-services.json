@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "582868073653",
+    "project_id": "rudra-d36fe",
+    "storage_bucket": "rudra-d36fe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:582868073653:android:35a9e0f23eb0b0f57012fc",
+        "android_client_info": {
+          "package_name": "com.pwd.rudra"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAf9uiwNLbwX29-E1HA5g01SKVcssF3I_M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

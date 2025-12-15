@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:rudra/config/theme/app_pallet.dart';
-import 'package:rudra/config/utils/assets.dart';
+import 'package:pothole/config/theme/app_pallet.dart';
+import 'package:pothole/config/utils/assets.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -16,20 +16,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final List<Map<String, String>> onboardingData = [
     {
-      'title': 'Spot a Pothole',
-      'subtitle': 'Report It Instantly. See a damaged road? Capture a photo and report it in seconds.',
-      'image': Assets.firstOnboarding,
+      'title': 'Spot it. Report it. Fix it.',
+      'subtitle':
+          'Empowering citizens to report potholes instantly and make roads safer for everyone.',
+      'image': Assets.firstOnboarding, // Replace with your image assets
     },
     {
-      'title': 'Smart Verification with AI.',
+      'title': 'Your Click Can Fix a Road.',
       'subtitle':
-          'Our AI analyses your photo to ensure accurate, genuine pothole reporting.',
+          'Just take a photo and let our AI-powered system handle the rest.',
       'image': Assets.secondOnboarding,
     },
     {
-      'title': 'Your Action Builds Better Roads',
+      'title': 'Drive Change. One Pothole at a Time',
       'subtitle':
-          'Every report helps improve road safety and supports sustainable infrastructure development.',
+          'Play your part in transforming road safety — it starts with one report.',
       'image': Assets.thirdOnboarding,
     },
   ];
