@@ -39,9 +39,9 @@ class ProfileProvider extends ChangeNotifier {
       ),
     });
     try {
-      final response = await apiService.patch(
+      final response = await apiService.patchMultipart(
         url: "/profile/update-photo",
-        data: formData,
+        formData: formData,
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         await getProfileData();

@@ -1,2 +1,0 @@
-pothole
-no_pothole
