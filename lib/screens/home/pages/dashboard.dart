@@ -428,10 +428,10 @@ class PotholeDetector {
   late List<String> _labels;
 
   final int inputSize = 640;
-  final double confidenceThreshold =
-      0.40; // Reduced threshold slightly for better recall
-  final int minDetections =
-      1; // Reduced from 3 to 1 to ensure single potholes are detected
+  
+  // Platform specific thresholds to maintain accuracy on Android while fixing iOS sensitivity
+  double get confidenceThreshold => Platform.isIOS ? 0.40 : 0.50;
+  int get minDetections => Platform.isIOS ? 1 : 3;
 
   Future<void> loadModel() async {
     try {
