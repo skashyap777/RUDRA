@@ -429,9 +429,9 @@ class PotholeDetector {
 
   final int inputSize = 640;
   final double confidenceThreshold =
-      0.50; // Threshold for pothole detection (50% confidence minimum)
+      0.40; // Reduced threshold slightly for better recall
   final int minDetections =
-      3; // Minimum number of high-confidence detections required
+      1; // Reduced from 3 to 1 to ensure single potholes are detected
 
   Future<void> loadModel() async {
     try {
@@ -444,7 +444,9 @@ class PotholeDetector {
               .map((e) => e.trim())
               .where((e) => e.isNotEmpty)
               .toList();
+      print("✅ Model loaded successfully. Output shape: ${_interpreter.getOutputTensors()[0].shape}");
     } catch (e) {
+      print("❌ Error loading model: $e");
       throw Exception("Failed to load AI model: $e");
     }
   }
@@ -457,40 +459,51 @@ class PotholeDetector {
         return "Invalid image";
       }
 
-      final resized = img.copyResize(raw, width: inputSize, height: inputSize);
+      // Handle orientation and resize
+      final oriented = img.bakeOrientation(raw);
+      final resized = img.copyResize(oriented, width: inputSize, height: inputSize);
 
-      // Build input: shape [1, 640, 640, 3]
-      List<List<List<List<double>>>> input = List.generate(
-        1,
-        (_) => List.generate(inputSize, (y) {
-          return List.generate(inputSize, (x) {
-            final pixel = resized.getPixel(x, y);
-            final r = pixel.r / 255.0;
-            final g = pixel.g / 255.0;
-            final b = pixel.b / 255.0;
-            return [r, g, b];
-          });
-        }),
-      );
+      // Build input: shape [1, 640, 640, 3] using Float32List for better performance
+      var input = Float32List(1 * inputSize * inputSize * 3);
+      var buffer = 0;
+      for (var y = 0; y < inputSize; y++) {
+        for (var x = 0; x < inputSize; x++) {
+          final pixel = resized.getPixel(x, y);
+          input[buffer++] = pixel.r / 255.0;
+          input[buffer++] = pixel.g / 255.0;
+          input[buffer++] = pixel.b / 255.0;
+        }
+      }
+      final reshapedInput = input.reshape([1, inputSize, inputSize, 3]);
 
-      // Get output tensor shape to handle both Android [1, 5, 8400] and iOS [1, 8400, 5] formats
+      // Get output tensor info
       final outputTensors = _interpreter.getOutputTensors();
       final outputShape = outputTensors[0].shape;
+      final numBoxes = outputShape.contains(8400) ? 8400 : outputShape[1];
+      final numElements = outputShape.contains(8400) 
+          ? (outputShape[1] == 8400 ? outputShape[2] : outputShape[1])
+          : outputShape[2];
       
+      print("🔍 [DEBUG] Output shape: $outputShape, Boxes: $numBoxes, Elements/classes: $numElements");
+
       double maxConfidence = 0.0;
       int highConfidenceCount = 0;
 
-      // Check if output is [1, 5, 8400] (Android) or [1, 8400, 5] (iOS)
-      if (outputShape.length == 3 && outputShape[1] == 5 && outputShape[2] == 8400) {
-        // Android format: [1, 5, 8400]
+      // Dynamic output buffer based on shape
+      if (outputShape[1] < outputShape[2]) {
+        // Format: [1, elements, boxes] (e.g. [1, 6, 8400])
         final output = List.generate(
           1,
-          (_) => List.generate(5, (_) => List.filled(8400, 0.0)),
+          (_) => List.generate(outputShape[1], (_) => List.filled(outputShape[2], 0.0)),
         );
-        _interpreter.run(input, output);
+        _interpreter.run(reshapedInput, output);
         
         final results = output[0];
-        for (int i = 0; i < 8400; i++) {
+        final elements = outputShape[1];
+        final boxes = outputShape[2];
+        
+        // In YOLOv8, index 4 is the first class score
+        for (int i = 0; i < boxes; i++) {
           final confidence = results[4][i];
           if (confidence > confidenceThreshold) {
             highConfidenceCount++;
@@ -499,17 +512,19 @@ class PotholeDetector {
             maxConfidence = confidence;
           }
         }
-      } else if (outputShape.length == 3 && outputShape[1] == 8400 && outputShape[2] == 5) {
-        // iOS format: [1, 8400, 5]
+      } else {
+        // Format: [1, boxes, elements] (e.g. [1, 8400, 6])
         final output = List.generate(
           1,
-          (_) => List.generate(8400, (_) => List.filled(5, 0.0)),
+          (_) => List.generate(outputShape[1], (_) => List.filled(outputShape[2], 0.0)),
         );
-        _interpreter.run(input, output);
+        _interpreter.run(reshapedInput, output);
         
         final results = output[0];
-        for (int i = 0; i < 8400; i++) {
-          final confidence = results[i][4]; // confidence is at index 4 of each detection
+        final boxes = outputShape[1];
+        
+        for (int i = 0; i < boxes; i++) {
+          final confidence = results[i][4];
           if (confidence > confidenceThreshold) {
             highConfidenceCount++;
           }
@@ -517,47 +532,10 @@ class PotholeDetector {
             maxConfidence = confidence;
           }
         }
-      } else {
-        // Fallback: try both formats
-        try {
-          final output = List.generate(
-            1,
-            (_) => List.generate(5, (_) => List.filled(8400, 0.0)),
-          );
-          _interpreter.run(input, output);
-          
-          final results = output[0];
-          for (int i = 0; i < 8400; i++) {
-            final confidence = results[4][i];
-            if (confidence > confidenceThreshold) {
-              highConfidenceCount++;
-            }
-            if (confidence > maxConfidence) {
-              maxConfidence = confidence;
-            }
-          }
-        } catch (_) {
-          // Try transposed format
-          final output = List.generate(
-            1,
-            (_) => List.generate(8400, (_) => List.filled(5, 0.0)),
-          );
-          _interpreter.run(input, output);
-          
-          final results = output[0];
-          for (int i = 0; i < 8400; i++) {
-            final confidence = results[i][4];
-            if (confidence > confidenceThreshold) {
-              highConfidenceCount++;
-            }
-            if (confidence > maxConfidence) {
-              maxConfidence = confidence;
-            }
-          }
-        }
       }
 
-      // Determine if pothole is detected using dual criteria
+      print("📊 [DEBUG] Max Confidence: $maxConfidence, High Confidence Detections: $highConfidenceCount");
+
       bool isPotholeDetected =
           maxConfidence >= confidenceThreshold &&
           highConfidenceCount >= minDetections;
@@ -565,12 +543,12 @@ class PotholeDetector {
       if (isPotholeDetected) {
         final label = _labels[0];
         final percentage = (maxConfidence * 100).toStringAsFixed(1);
-        final result = "$label detected ($percentage%)";
-        return result;
+        return "$label detected ($percentage%)";
       } else {
         return "No pothole detected";
       }
     } catch (e) {
+      print("❌ [DEBUG] Prediction error: $e");
       return "Error processing image";
     }
   }
