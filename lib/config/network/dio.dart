@@ -113,7 +113,7 @@ class HTTP {
 
     final options = Options(
       headers: {
-        'Accept': '*/*',
+        'Accept': 'application/json',
         "Authorization": "Bearer $token",
         // DO NOT set Content-Type here — Dio sets it automatically for multipart/form-data
       },
@@ -140,7 +140,7 @@ class HTTP {
 
     final options = Options(
       headers: {
-        'Accept': '*/*',
+        'Accept': 'application/json',
         "Authorization": "Bearer $token",
         // DO NOT set Content-Type here — Dio sets it automatically for multipart/form-data
       },

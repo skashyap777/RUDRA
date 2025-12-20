@@ -272,8 +272,9 @@ class _EditProfileState extends State<EditProfile> {
                       context,
                       listen: false,
                     );
-                    final res = await profileProvider.updateUserName(
-                      _nameController.text,
+                    final res = await profileProvider.updateProfile(
+                      name: _nameController.text,
+                      address: _locationController.text,
                     );
                     if (res) {
                       // Refresh the provider to update the UI

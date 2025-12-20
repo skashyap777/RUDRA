@@ -50,11 +50,18 @@ class ProfileProvider extends ChangeNotifier {
       String filename = file.path.split("/").last;
       debugPrint("📝 Filename: $filename");
       
+      final fileExtension = file.path.split('.').last.toLowerCase();
+      final contentType = fileExtension == 'png'
+          ? 'image/png'
+          : fileExtension == 'jpg' || fileExtension == 'jpeg'
+              ? 'image/jpeg'
+              : 'image/jpeg'; // fallback
+      
       FormData formData = FormData.fromMap({
         "profile_photo": await MultipartFile.fromFile(
           file.path,
           filename: filename,
-          contentType: DioMediaType("image", "png"),
+          contentType: DioMediaType.parse(contentType),
         ),
       });
       
@@ -88,13 +95,14 @@ class ProfileProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> updateUserName(String name) async {
+  Future<bool> updateProfile({required String name, required String address}) async {
     try {
       final response = await apiService.patch(
         url: "/profile/update-name",
         data: {
           "name": name,
-        }, // Fixed: Use "name" as the key, not the variable name
+          "address": address,
+        },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         // Refresh profile data after successful update
