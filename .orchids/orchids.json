@@ -1,0 +1,7 @@
+{
+  "projectId": "ff12b9c5-ef4d-4a22-89de-014295a76706",
+  "createdAt": 1766247691705,
+  "startupCommands": [
+    "flutter pub get; flutter run -d web-server --web-port 3000"
+  ]
+}
