@@ -237,34 +237,36 @@ class _AddPotholeState extends State<AddPothole> {
                                     : Container(
                                       color: Colors.grey[200],
                                       child: Center(
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              Icons.location_off,
-                                              color: Colors.grey[600],
-                                              size: 32,
-                                            ),
-                                            SizedBox(height: 8),
-                                            Text(
-                                              'Location not available',
-                                              style: TextStyle(
+                                        child: SingleChildScrollView(
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.location_off,
                                                 color: Colors.grey[600],
+                                                size: 32,
                                               ),
-                                            ),
-                                            SizedBox(height: 8),
-                                            ElevatedButton(
-                                              onPressed: _getCurrentLocation,
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: Color(
-                                                  0xFF4CAF50,
+                                              SizedBox(height: 8),
+                                              Text(
+                                                'Location not available',
+                                                style: TextStyle(
+                                                  color: Colors.grey[600],
                                                 ),
-                                                foregroundColor: Colors.white,
                                               ),
-                                              child: Text('Retry'),
-                                            ),
-                                          ],
+                                              SizedBox(height: 8),
+                                              ElevatedButton(
+                                                onPressed: _getCurrentLocation,
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: const Color(
+                                                    0xFF4CAF50,
+                                                  ),
+                                                  foregroundColor: Colors.white,
+                                                ),
+                                                child: const Text('Retry'),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),

@@ -19,9 +19,9 @@ class HomeProvider extends ChangeNotifier {
 
   Future<Map<String, dynamic>> createPothole(FormData formData) async {
     try {
-      final response = await apiService.post(
+      final response = await apiService.postMultipart(
         url: "/pothole/create",
-        data: formData,
+        formData: formData,
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         return {'success': true, 'message': 'Report submitted successfully'};
