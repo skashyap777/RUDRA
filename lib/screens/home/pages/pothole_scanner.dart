@@ -41,7 +41,6 @@ class _AddPotholeState extends State<AddPothole> {
   Position? _currentPosition;
   bool _isLoadingLocation = true;
   Set<Marker> _markers = {};
-  String? severity;
   int index = 0;
 
   @override
@@ -273,32 +272,6 @@ class _AddPotholeState extends State<AddPothole> {
                           ),
                         ),
                         SizedBox(height: 20),
-                        DropdownButtonFormField<String>(
-                          decoration: InputDecoration(
-                            labelText: "Severity*",
-                            border: OutlineInputBorder(),
-                          ),
-                          value: severity,
-                          items:
-                              ["High", "Medium", "Low"]
-                                  .map(
-                                    (level) => DropdownMenuItem(
-                                      value: level,
-                                      child: Text(level),
-                                    ),
-                                  )
-                                  .toList(),
-                          onChanged: (val) {
-                            setState(() {
-                              severity = val;
-                            });
-                          },
-                          validator:
-                              (value) =>
-                                  value == null
-                                      ? "Please select severity"
-                                      : null,
-                        ),
 
                         _buildInfoSection(
                           'Area of the Pothole*',
@@ -489,7 +462,6 @@ class _AddPotholeState extends State<AddPothole> {
       FormData formData = FormData.fromMap({
         "potholeImages": potholeImages,
         "coordinates": coordinatesJson,
-        "severity": severity,
         "area_details": _areaController.text,
         "landmark": _landmarkController.text,
         "remarks": _remarkController.text,
