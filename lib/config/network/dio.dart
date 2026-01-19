@@ -114,7 +114,7 @@ class HTTP {
     final options = Options(
       headers: {
         'Accept': 'application/json',
-        "Authorization": "Bearer $token",
+        "Authorization": "Bearer ${token.trim()}",
         // DO NOT set Content-Type here — Dio sets it automatically for multipart/form-data
       },
     );
@@ -141,7 +141,7 @@ class HTTP {
     final options = Options(
       headers: {
         'Accept': 'application/json',
-        "Authorization": "Bearer $token",
+        "Authorization": "Bearer ${token.trim()}",
         // DO NOT set Content-Type here — Dio sets it automatically for multipart/form-data
       },
     );
@@ -180,7 +180,7 @@ class HTTP {
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        "Authorization": "Bearer $token",
+        "Authorization": "Bearer ${token.trim()}",
       },
     );
   }

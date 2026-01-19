@@ -19,12 +19,14 @@ class _ScanPothholeState extends State<ScanPothhole>
   late AnimationController _controller;
   late Animation<double> _animation;
   final detector = PotholeDetector();
+  bool _isInitializing = true;
+  String? _initError;
 
   @override
   void initState() {
     super.initState();
     // Initialize detector and animation
-    _initializeDetector();
+    _setup();
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(
@@ -45,48 +47,75 @@ class _ScanPothholeState extends State<ScanPothhole>
     _startProcessing();
   }
 
-  Future<void> _initializeDetector() async {
+  Future<void> _setup() async {
     try {
       await detector.loadModel();
-      print("Detector initialized successfully");
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+        });
+        _startProcessing();
+      }
     } catch (e) {
-      print("Failed to initialize detector: $e");
+      debugPrint("❌ [SCAN] Failed to initialize detector: $e");
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+          _initError = e.toString();
+        });
+        AppFunctions.showCustomSnackBar(
+          context,
+          "AI Model failed to load. Please try again.",
+          backgroundColor: Colors.red,
+        );
+      }
     }
   }
 
   void _startProcessing() {
-    Future.delayed(const Duration(seconds: 3), () async {
-      if (mounted) {
-        try {
-          print("🚀 [DEBUG] Starting AI processing...");
-          // Use regular predict() instead of background to see detailed logs
-          final result = await detector.predict(widget.file);
-          print("✅ [DEBUG] AI Prediction result: $result");
+    // Wait for animation to run a bit before showing result
+    Future.delayed(const Duration(seconds: 2), () async {
+      if (!mounted) return;
 
-          // Navigate to appropriate screen based on detection result
-          // Check if result contains "pothole" but NOT "No pothole"
-          final isPotholeDetected =
-              result.toLowerCase().contains("pothole") &&
-              !result.toLowerCase().contains("no pothole");
+      try {
+        debugPrint("🚀 [SCAN] Starting AI processing...");
+        final result = await detector.predict(widget.file);
+        debugPrint("✅ [SCAN] AI Prediction result: $result");
 
-          if (isPotholeDetected) {
-            // Pothole detected - navigate to success screen
-            print("🎯 [DEBUG] Navigating to pothole detected screen");
-            context.pushReplacement('/potholeDetected', extra: widget.file);
-          } else {
-            // No pothole detected - navigate to info screen
-            print("ℹ️ [DEBUG] Navigating to no pothole detected screen");
-            context.pushReplacement('/noPotholeDetected', extra: widget.file);
-          }
-        } catch (e, stackTrace) {
-          print("❌ [DEBUG] Error during AI prediction: $e");
-          print("📍 [DEBUG] Stack trace: $stackTrace");
+        if (!mounted) return;
+
+        // Check for error in result
+        if (result.startsWith("Error") || result.contains("not ready")) {
+          AppFunctions.showCustomSnackBar(
+            context,
+            "Analysis failed: $result",
+            backgroundColor: Colors.red,
+          );
+          Navigator.pop(context);
+          return;
+        }
+
+        // Navigate based on detection result
+        final isPotholeDetected =
+            result.toLowerCase().contains("pothole") &&
+            !result.toLowerCase().contains("no pothole");
+
+        if (isPotholeDetected) {
+          debugPrint("🎯 [SCAN] Navigating to pothole detected screen");
+          context.pushReplacement('/potholeDetected', extra: widget.file);
+        } else {
+          debugPrint("ℹ️ [SCAN] Navigating to no pothole detected screen");
+          context.pushReplacement('/noPotholeDetected', extra: widget.file);
+        }
+      } catch (e, stackTrace) {
+        debugPrint("❌ [SCAN] Error during AI prediction: $e");
+        debugPrint("📍 [SCAN] Stack trace: $stackTrace");
+        if (mounted) {
           AppFunctions.showCustomSnackBar(
             context,
             "Failed to analyze image. Please try again.",
             backgroundColor: Colors.red,
           );
-          // Navigate back to dashboard on error
           Navigator.pop(context);
         }
       }
@@ -199,19 +228,39 @@ class _ScanPothholeState extends State<ScanPothhole>
           const SizedBox(height: 20),
 
           // Scanning Text
-          const Text(
-            "Scanning for Road Issue...",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          Text(
+            _isInitializing
+                ? "Initializing AI..."
+                : _initError != null
+                ? "Initialization Failed"
+                : "Scanning for Road Issue...",
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 10),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 30.0),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 30.0),
             child: Text(
-              "Please hold steady. We're analyzing the image to detect a road issue.",
+              _initError != null
+                  ? "Error: $_initError"
+                  : "Please hold steady. We're analyzing the image to detect a road issue.",
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.black54, fontSize: 13),
+              style: const TextStyle(color: Colors.black54, fontSize: 13),
             ),
           ),
+          if (_initError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 20),
+              child: ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _isInitializing = true;
+                    _initError = null;
+                  });
+                  _setup();
+                },
+                child: const Text("Retry"),
+              ),
+            ),
         ],
       ),
     );
