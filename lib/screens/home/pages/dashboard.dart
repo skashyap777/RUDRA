@@ -425,8 +425,9 @@ class _DashboardState extends State<Dashboard> {
 }
 
 class PotholeDetector {
-  late Interpreter _interpreter;
-  late List<String> _labels;
+  Interpreter? _interpreter;
+  List<String>? _labels;
+  bool _isLoaded = false;
 
   final int inputSize = 640;
   
@@ -434,26 +435,45 @@ class PotholeDetector {
   double get confidenceThreshold => Platform.isIOS ? 0.40 : 0.50;
   int get minDetections => Platform.isIOS ? 1 : 3;
 
+  bool get isReady => _isLoaded && _interpreter != null && _labels != null;
+
   Future<void> loadModel() async {
+    if (_isLoaded) return;
     try {
+      debugPrint("🔄 [AI] Loading model and labels...");
       _interpreter = await Interpreter.fromAsset(
         'assets/model/best_float32.tflite',
       );
-      _labels =
-          (await rootBundle.loadString('assets/model/labels.txt'))
+      final labelString = await rootBundle.loadString('assets/model/labels.txt');
+      _labels = labelString
               .split('\n')
               .map((e) => e.trim())
               .where((e) => e.isNotEmpty)
               .toList();
-      print("✅ Model loaded successfully. Output shape: ${_interpreter.getOutputTensors()[0].shape}");
+
+      if (_labels == null || _labels!.isEmpty) {
+        throw Exception("Labels file is empty or could not be parsed");
+      }
+
+      _isLoaded = true;
+      debugPrint("✅ [AI] Model loaded successfully. Output shape: ${_interpreter!.getOutputTensors()[0].shape}");
+      debugPrint("✅ [AI] Labels: $_labels");
     } catch (e) {
-      print("❌ Error loading model: $e");
+      debugPrint("❌ [AI] Error loading model: $e");
+      _isLoaded = false;
       throw Exception("Failed to load AI model: $e");
     }
   }
 
   Future<String> predict(File imageFile) async {
+    if (!isReady) {
+      debugPrint("⚠️ [AI] Predict called before model was ready. Attempting to load...");
+      await loadModel();
+      if (!isReady) return "Model not ready";
+    }
+
     try {
+      debugPrint("🚀 [AI] Starting prediction for: ${imageFile.path}");
       final bytes = await imageFile.readAsBytes();
       final raw = img.decodeImage(bytes);
       if (raw == null) {
@@ -478,14 +498,14 @@ class PotholeDetector {
       final reshapedInput = input.reshape([1, inputSize, inputSize, 3]);
 
       // Get output tensor info
-      final outputTensors = _interpreter.getOutputTensors();
+      final outputTensors = _interpreter!.getOutputTensors();
       final outputShape = outputTensors[0].shape;
       final numBoxes = outputShape.contains(8400) ? 8400 : outputShape[1];
       final numElements = outputShape.contains(8400) 
           ? (outputShape[1] == 8400 ? outputShape[2] : outputShape[1])
           : outputShape[2];
       
-      print("🔍 [DEBUG] Output shape: $outputShape, Boxes: $numBoxes, Elements/classes: $numElements");
+      debugPrint("🔍 [AI] Output shape: $outputShape, Boxes: $numBoxes, Elements/classes: $numElements");
 
       double maxConfidence = 0.0;
       int highConfidenceCount = 0;
@@ -497,7 +517,7 @@ class PotholeDetector {
           1,
           (_) => List.generate(outputShape[1], (_) => List.filled(outputShape[2], 0.0)),
         );
-        _interpreter.run(reshapedInput, output);
+        _interpreter!.run(reshapedInput, output);
         
         final results = output[0];
         final elements = outputShape[1];
@@ -519,7 +539,7 @@ class PotholeDetector {
           1,
           (_) => List.generate(outputShape[1], (_) => List.filled(outputShape[2], 0.0)),
         );
-        _interpreter.run(reshapedInput, output);
+        _interpreter!.run(reshapedInput, output);
         
         final results = output[0];
         final boxes = outputShape[1];
@@ -535,22 +555,23 @@ class PotholeDetector {
         }
       }
 
-      print("📊 [DEBUG] Max Confidence: $maxConfidence, High Confidence Detections: $highConfidenceCount");
+      debugPrint("📊 [AI] Max Confidence: $maxConfidence, High Confidence Detections: $highConfidenceCount");
 
       bool isPotholeDetected =
           maxConfidence >= confidenceThreshold &&
           highConfidenceCount >= minDetections;
 
       if (isPotholeDetected) {
-        final label = _labels[0];
+        final label = _labels![0];
         final percentage = (maxConfidence * 100).toStringAsFixed(1);
         return "$label detected ($percentage%)";
       } else {
+        debugPrint("ℹ️ [AI] No pothole detected (Max: $maxConfidence, Count: $highConfidenceCount)");
         return "No pothole detected";
       }
     } catch (e) {
-      print("❌ [DEBUG] Prediction error: $e");
-      return "Error processing image";
+      debugPrint("❌ [AI] Prediction error: $e");
+      return "Error processing image: $e";
     }
   }
 
@@ -563,7 +584,7 @@ class PotholeDetector {
   }
 
   void dispose() {
-    _interpreter.close();
+    _interpreter?.close();
   }
 }
 
