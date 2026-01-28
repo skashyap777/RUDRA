@@ -33,7 +33,8 @@ workflows:
         script: |
           echo "📦 Installing iOS dependencies with CocoaPods..."
           cd ios
-          pod install --repo-update
+          pod repo update
+          pod install
           echo "✅ Pod install completed"
           
           echo "🔍 Verifying TensorFlowLiteC installation..."
