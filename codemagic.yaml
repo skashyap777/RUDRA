@@ -1,6 +1,6 @@
 workflows:
   ios-workflow:
-    name: iOS Build and TestFlight
+    name: iOS Build and TestFlight (Fixed TFLite)
     environment:
       groups:
         - app_store_credentials
