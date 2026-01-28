@@ -425,9 +425,8 @@ class _DashboardState extends State<Dashboard> {
 }
 
 class PotholeDetector {
-  Interpreter? _interpreter;
-  List<String>? _labels;
-  bool _isLoaded = false;
+  late Interpreter _interpreter;
+  late List<String> _labels;
 
   final int inputSize = 640;
   
@@ -435,56 +434,66 @@ class PotholeDetector {
   double get confidenceThreshold => Platform.isIOS ? 0.40 : 0.50;
   int get minDetections => Platform.isIOS ? 1 : 3;
 
-  bool get isReady => _isLoaded && _interpreter != null && _labels != null;
-
   Future<void> loadModel() async {
-    if (_isLoaded) return;
     try {
-      debugPrint("🔄 [AI] Loading model and labels...");
+      debugPrint("🔄 [iOS DEBUG] Starting model loading...");
+      debugPrint("🔄 [iOS DEBUG] Platform: ${Platform.operatingSystem}");
+      debugPrint("🔄 [iOS DEBUG] Platform.isIOS: ${Platform.isIOS}");
+      
       _interpreter = await Interpreter.fromAsset(
         'assets/model/best_float32.tflite',
       );
-      final labelString = await rootBundle.loadString('assets/model/labels.txt');
-      _labels = labelString
+      debugPrint("✅ [iOS DEBUG] TFLite interpreter loaded successfully");
+      
+      _labels =
+          (await rootBundle.loadString('assets/model/labels.txt'))
               .split('\n')
               .map((e) => e.trim())
               .where((e) => e.isNotEmpty)
               .toList();
-
-      if (_labels == null || _labels!.isEmpty) {
-        throw Exception("Labels file is empty or could not be parsed");
-      }
-
-      _isLoaded = true;
-      debugPrint("✅ [AI] Model loaded successfully. Output shape: ${_interpreter!.getOutputTensors()[0].shape}");
-      debugPrint("✅ [AI] Labels: $_labels");
+      
+      debugPrint("✅ [iOS DEBUG] Labels loaded: ${_labels.length} labels");
+      debugPrint("✅ [iOS DEBUG] Labels: $_labels");
+      debugPrint("✅ [iOS DEBUG] Model output shape: ${_interpreter.getOutputTensors()[0].shape}");
+      debugPrint("✅ [iOS DEBUG] Model input shape: ${_interpreter.getInputTensors()[0].shape}");
+      debugPrint("✅ [iOS DEBUG] Confidence threshold: $confidenceThreshold");
+      debugPrint("✅ [iOS DEBUG] Min detections: $minDetections");
     } catch (e) {
-      debugPrint("❌ [AI] Error loading model: $e");
-      _isLoaded = false;
+      debugPrint("❌ [iOS DEBUG] Error loading model: $e");
+      debugPrint("❌ [iOS DEBUG] Stack trace: ${StackTrace.current}");
       throw Exception("Failed to load AI model: $e");
     }
   }
 
   Future<String> predict(File imageFile) async {
-    if (!isReady) {
-      debugPrint("⚠️ [AI] Predict called before model was ready. Attempting to load...");
-      await loadModel();
-      if (!isReady) return "Model not ready";
-    }
-
     try {
-      debugPrint("🚀 [AI] Starting prediction for: ${imageFile.path}");
+      debugPrint("🔍 [iOS DEBUG] Starting prediction...");
+      debugPrint("🔍 [iOS DEBUG] Platform: ${Platform.operatingSystem}");
+      debugPrint("🔍 [iOS DEBUG] Image file path: ${imageFile.path}");
+      debugPrint("🔍 [iOS DEBUG] Image file exists: ${await imageFile.exists()}");
+      
       final bytes = await imageFile.readAsBytes();
+      debugPrint("🔍 [iOS DEBUG] Image bytes length: ${bytes.length}");
+      
       final raw = img.decodeImage(bytes);
       if (raw == null) {
+        debugPrint("❌ [iOS DEBUG] Failed to decode image");
         return "Invalid image";
       }
+      
+      debugPrint("🔍 [iOS DEBUG] Original image size: ${raw.width}x${raw.height}");
+      debugPrint("🔍 [iOS DEBUG] Original image format: ${raw.format}");
+      debugPrint("🔍 [iOS DEBUG] Original image channels: ${raw.numChannels}");
 
       // Handle orientation and resize
       final oriented = img.bakeOrientation(raw);
+      debugPrint("🔍 [iOS DEBUG] After bakeOrientation: ${oriented.width}x${oriented.height}");
+      
       final resized = img.copyResize(oriented, width: inputSize, height: inputSize);
+      debugPrint("🔍 [iOS DEBUG] After resize: ${resized.width}x${resized.height}");
 
       // Build input: shape [1, 640, 640, 3] using Float32List for better performance
+      debugPrint("🔍 [iOS DEBUG] Building input tensor...");
       var input = Float32List(1 * inputSize * inputSize * 3);
       var buffer = 0;
       for (var y = 0; y < inputSize; y++) {
@@ -496,58 +505,75 @@ class PotholeDetector {
         }
       }
       final reshapedInput = input.reshape([1, inputSize, inputSize, 3]);
+      debugPrint("🔍 [iOS DEBUG] Input tensor created: ${reshapedInput.length} elements");
 
       // Get output tensor info
-      final outputTensors = _interpreter!.getOutputTensors();
+      final outputTensors = _interpreter.getOutputTensors();
       final outputShape = outputTensors[0].shape;
       final numBoxes = outputShape.contains(8400) ? 8400 : outputShape[1];
       final numElements = outputShape.contains(8400) 
           ? (outputShape[1] == 8400 ? outputShape[2] : outputShape[1])
           : outputShape[2];
       
-      debugPrint("🔍 [AI] Output shape: $outputShape, Boxes: $numBoxes, Elements/classes: $numElements");
+      debugPrint("🔍 [iOS DEBUG] Output shape: $outputShape");
+      debugPrint("🔍 [iOS DEBUG] Detected boxes: $numBoxes");
+      debugPrint("🔍 [iOS DEBUG] Elements per box: $numElements");
+      debugPrint("🔍 [iOS DEBUG] Confidence threshold: $confidenceThreshold");
+      debugPrint("🔍 [iOS DEBUG] Min detections required: $minDetections");
 
       double maxConfidence = 0.0;
       int highConfidenceCount = 0;
+      List<double> allConfidences = [];
 
       // Dynamic output buffer based on shape
       if (outputShape[1] < outputShape[2]) {
+        debugPrint("🔍 [iOS DEBUG] Using format [1, elements, boxes]");
         // Format: [1, elements, boxes] (e.g. [1, 6, 8400])
         final output = List.generate(
           1,
           (_) => List.generate(outputShape[1], (_) => List.filled(outputShape[2], 0.0)),
         );
-        _interpreter!.run(reshapedInput, output);
+        
+        debugPrint("🔍 [iOS DEBUG] Running inference...");
+        _interpreter.run(reshapedInput, output);
+        debugPrint("🔍 [iOS DEBUG] Inference completed");
         
         final results = output[0];
-        final elements = outputShape[1];
         final boxes = outputShape[2];
         
         // In YOLOv8, index 4 is the first class score
         for (int i = 0; i < boxes; i++) {
           final confidence = results[4][i];
+          allConfidences.add(confidence);
           if (confidence > confidenceThreshold) {
             highConfidenceCount++;
+            debugPrint("🔍 [iOS DEBUG] High confidence detection $highConfidenceCount: $confidence at box $i");
           }
           if (confidence > maxConfidence) {
             maxConfidence = confidence;
           }
         }
       } else {
+        debugPrint("🔍 [iOS DEBUG] Using format [1, boxes, elements]");
         // Format: [1, boxes, elements] (e.g. [1, 8400, 6])
         final output = List.generate(
           1,
           (_) => List.generate(outputShape[1], (_) => List.filled(outputShape[2], 0.0)),
         );
-        _interpreter!.run(reshapedInput, output);
+        
+        debugPrint("🔍 [iOS DEBUG] Running inference...");
+        _interpreter.run(reshapedInput, output);
+        debugPrint("🔍 [iOS DEBUG] Inference completed");
         
         final results = output[0];
         final boxes = outputShape[1];
         
         for (int i = 0; i < boxes; i++) {
           final confidence = results[i][4];
+          allConfidences.add(confidence);
           if (confidence > confidenceThreshold) {
             highConfidenceCount++;
+            debugPrint("🔍 [iOS DEBUG] High confidence detection $highConfidenceCount: $confidence at box $i");
           }
           if (confidence > maxConfidence) {
             maxConfidence = confidence;
@@ -555,23 +581,35 @@ class PotholeDetector {
         }
       }
 
-      debugPrint("📊 [AI] Max Confidence: $maxConfidence, High Confidence Detections: $highConfidenceCount");
+      // Sort confidences to see top detections
+      allConfidences.sort((a, b) => b.compareTo(a));
+      debugPrint("🔍 [iOS DEBUG] Top 10 confidences: ${allConfidences.take(10).toList()}");
+      debugPrint("🔍 [iOS DEBUG] Max confidence: $maxConfidence");
+      debugPrint("🔍 [iOS DEBUG] High confidence count: $highConfidenceCount");
+      debugPrint("🔍 [iOS DEBUG] Threshold check: maxConfidence ($maxConfidence) >= confidenceThreshold ($confidenceThreshold) = ${maxConfidence >= confidenceThreshold}");
+      debugPrint("🔍 [iOS DEBUG] Count check: highConfidenceCount ($highConfidenceCount) >= minDetections ($minDetections) = ${highConfidenceCount >= minDetections}");
 
       bool isPotholeDetected =
           maxConfidence >= confidenceThreshold &&
           highConfidenceCount >= minDetections;
 
+      debugPrint("🔍 [iOS DEBUG] Final detection result: $isPotholeDetected");
+
       if (isPotholeDetected) {
-        final label = _labels![0];
+        final label = _labels.isNotEmpty ? _labels[0] : "Pothole";
         final percentage = (maxConfidence * 100).toStringAsFixed(1);
-        return "$label detected ($percentage%)";
+        final result = "$label detected ($percentage%)";
+        debugPrint("✅ [iOS DEBUG] Pothole detected: $result");
+        return result;
       } else {
-        debugPrint("ℹ️ [AI] No pothole detected (Max: $maxConfidence, Count: $highConfidenceCount)");
-        return "No pothole detected";
+        final result = "No pothole detected";
+        debugPrint("❌ [iOS DEBUG] No pothole detected - maxConf: $maxConfidence, count: $highConfidenceCount");
+        return result;
       }
     } catch (e) {
-      debugPrint("❌ [AI] Prediction error: $e");
-      return "Error processing image: $e";
+      debugPrint("❌ [iOS DEBUG] Prediction error: $e");
+      debugPrint("❌ [iOS DEBUG] Stack trace: ${StackTrace.current}");
+      return "Error processing image";
     }
   }
 
@@ -584,7 +622,7 @@ class PotholeDetector {
   }
 
   void dispose() {
-    _interpreter?.close();
+    _interpreter.close();
   }
 }
 

@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:rudra/config/utils/local_storage.dart';
-
 import 'package:rudra/config/constants/api_constants.dart';
 
 Future<Dio> createBaseDio() async {
@@ -91,15 +91,32 @@ class HTTP {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
+    debugPrint("🌐 [iOS DEBUG] patch called");
+    debugPrint("🌐 [iOS DEBUG] URL: $url");
+    debugPrint("🌐 [iOS DEBUG] Data: $data");
+    debugPrint("🌐 [iOS DEBUG] Query parameters: $queryParameters");
+    
     final options = await _getRequestOptions();
-    return await _dioClient.patch(
-      url,
-      data: data,
-      queryParameters: queryParameters,
-      options: options,
-      onSendProgress: onSendProgress,
-      onReceiveProgress: onReceiveProgress,
-    );
+    debugPrint("🌐 [iOS DEBUG] Request headers: ${options.headers}");
+    
+    try {
+      final response = await _dioClient.patch(
+        url,
+        data: data,
+        queryParameters: queryParameters,
+        options: options,
+        onSendProgress: onSendProgress,
+        onReceiveProgress: onReceiveProgress,
+      );
+      
+      debugPrint("🌐 [iOS DEBUG] patch response received");
+      debugPrint("🌐 [iOS DEBUG] Response status: ${response.statusCode}");
+      
+      return response;
+    } catch (e) {
+      debugPrint("❌ [iOS DEBUG] patch error: $e");
+      rethrow;
+    }
   }
 
   Future<Response> postMultipart({
@@ -136,7 +153,12 @@ class HTTP {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
+    debugPrint("🌐 [iOS DEBUG] patchMultipart called");
+    debugPrint("🌐 [iOS DEBUG] URL: $url");
+    debugPrint("🌐 [iOS DEBUG] Query parameters: $queryParameters");
+    
     final token = await TokenHandler.getString("token");
+    debugPrint("🌐 [iOS DEBUG] Token retrieved successfully");
 
     final options = Options(
       headers: {
@@ -145,15 +167,32 @@ class HTTP {
         // DO NOT set Content-Type here — Dio sets it automatically for multipart/form-data
       },
     );
+    
+    debugPrint("🌐 [iOS DEBUG] Request headers: ${options.headers}");
+    debugPrint("🌐 [iOS DEBUG] FormData fields: ${formData.fields}");
+    debugPrint("🌐 [iOS DEBUG] FormData files count: ${formData.files.length}");
 
-    return await _dioClient.patch(
-      url,
-      data: formData,
-      queryParameters: queryParameters,
-      options: options,
-      onSendProgress: onSendProgress,
-      onReceiveProgress: onReceiveProgress,
-    );
+    try {
+      final response = await _dioClient.patch(
+        url,
+        data: formData,
+        queryParameters: queryParameters,
+        options: options,
+        onSendProgress: (sent, total) {
+          debugPrint("🌐 [iOS DEBUG] Upload progress: $sent / $total bytes");
+          onSendProgress?.call(sent, total);
+        },
+        onReceiveProgress: onReceiveProgress,
+      );
+      
+      debugPrint("🌐 [iOS DEBUG] patchMultipart response received");
+      debugPrint("🌐 [iOS DEBUG] Response status: ${response.statusCode}");
+      
+      return response;
+    } catch (e) {
+      debugPrint("❌ [iOS DEBUG] patchMultipart error: $e");
+      rethrow;
+    }
   }
 
   Future<Response> put({
