@@ -7,15 +7,67 @@ workflows:
       vars:
         XCODE_WORKSPACE: "Runner.xcworkspace"
         XCODE_SCHEME: "Runner"
+      xcode: latest
+      cocoapods: default
     scripts:
-      - name: Flutter build ipa
+      - name: Pre-build checks
         script: |
+          echo "🔍 Checking Flutter version..."
+          flutter --version
+          
+          echo "🔍 Checking CocoaPods version..."
+          pod --version
+          
+          echo "🔍 Verifying TFLite model files..."
+          ls -la assets/model/
+          
+          echo "🔍 Checking Podfile configuration..."
+          cat ios/Podfile | grep -A 2 "TensorFlowLiteC" || echo "⚠️ TensorFlowLiteC not found in Podfile"
+      
+      - name: Get Flutter dependencies
+        script: |
+          echo "📦 Getting Flutter dependencies..."
+          flutter pub get
+          
+      - name: Install CocoaPods dependencies
+        script: |
+          echo "📦 Installing iOS dependencies with CocoaPods..."
+          cd ios
+          pod install --repo-update
+          echo "✅ Pod install completed"
+          
+          echo "🔍 Verifying TensorFlowLiteC installation..."
+          if [ -d "Pods/TensorFlowLiteC" ]; then
+            echo "✅ TensorFlowLiteC pod installed successfully"
+            ls -la Pods/TensorFlowLiteC/
+          else
+            echo "❌ TensorFlowLiteC pod NOT found - AI model will fail!"
+            exit 1
+          fi
+          cd ..
+      
+      - name: Flutter analyze
+        script: |
+          echo "🔍 Running Flutter analyze..."
+          flutter analyze || echo "⚠️ Analysis warnings found"
+      
+      - name: Build iOS app
+        script: |
+          echo "🏗️ Building iOS IPA for TestFlight..."
           flutter build ipa \
             --release \
             --build-name=1.0.0 \
-            --build-number=$BUILD_NUMBER
+            --build-number=$BUILD_NUMBER \
+            --verbose
+          
+          echo "✅ Build completed successfully!"
+          ls -la build/ios/ipa/
+    
     artifacts:
       - build/ios/ipa/*.ipa
+      - ios/Pods/Manifest.lock
+      - flutter_analyze.log
+    
     publishing:
       app_store_connect:
         api_key: $APP_STORE_CONNECT_API_KEY
