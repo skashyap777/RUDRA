@@ -33,9 +33,30 @@ workflows:
         script: |
           echo "📦 Installing iOS dependencies with CocoaPods..."
           cd ios
+          
+          # Update pod repo
           pod repo update
-          pod install
-          echo "✅ Pod install completed"
+          
+          # Install pods with retry logic for network issues
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES..."
+            if pod install; then
+              echo "✅ Pod install completed successfully"
+              break
+            else
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                echo "⚠️ Pod install failed, retrying in 10 seconds..."
+                sleep 10
+              else
+                echo "❌ Pod install failed after $MAX_RETRIES attempts"
+                exit 1
+              fi
+            fi
+          done
           
           echo "🔍 Verifying TensorFlowLiteC installation..."
           if [ -d "Pods/TensorFlowLiteC" ]; then
@@ -77,3 +98,12 @@ workflows:
         export_compliance:
           uses_encryption: false # Set to true if your app uses encryption
           encryption_updated: false # Set to true if encryption has been updated
+        # Beta app review info for TestFlight
+        beta_app_review_info:
+          contact_email: samudrakashyap777@gmail.com
+          contact_first_name: Samudra
+          contact_last_name: Kashyap
+          contact_phone: "+91-9999999999"
+          demo_account_name: ""
+          demo_account_password: ""
+          notes: "RUDRA - Road Maintenance Reporting App for pothole detection and reporting."
