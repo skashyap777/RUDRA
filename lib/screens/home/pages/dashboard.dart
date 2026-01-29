@@ -429,195 +429,70 @@ class PotholeDetector {
   late List<String> _labels;
 
   final int inputSize = 640;
-  
-  // Platform specific thresholds to maintain accuracy on Android while fixing iOS sensitivity
-  double get confidenceThreshold => Platform.isIOS ? 0.40 : 0.50;
-  int get minDetections => Platform.isIOS ? 1 : 3;
+  final double confidenceThreshold = 0.3;
 
   Future<void> loadModel() async {
-    try {
-      debugPrint("🔄 [iOS DEBUG] Starting model loading...");
-      debugPrint("🔄 [iOS DEBUG] Platform: ${Platform.operatingSystem}");
-      debugPrint("🔄 [iOS DEBUG] Platform.isIOS: ${Platform.isIOS}");
-      
-      _interpreter = await Interpreter.fromAsset(
-        'assets/model/best_float32.tflite',
-      );
-      debugPrint("✅ [iOS DEBUG] TFLite interpreter loaded successfully");
-      
-      _labels =
-          (await rootBundle.loadString('assets/model/labels.txt'))
-              .split('\n')
-              .map((e) => e.trim())
-              .where((e) => e.isNotEmpty)
-              .toList();
-      
-      debugPrint("✅ [iOS DEBUG] Labels loaded: ${_labels.length} labels");
-      debugPrint("✅ [iOS DEBUG] Labels: $_labels");
-      debugPrint("✅ [iOS DEBUG] Model output shape: ${_interpreter.getOutputTensors()[0].shape}");
-      debugPrint("✅ [iOS DEBUG] Model input shape: ${_interpreter.getInputTensors()[0].shape}");
-      debugPrint("✅ [iOS DEBUG] Confidence threshold: $confidenceThreshold");
-      debugPrint("✅ [iOS DEBUG] Min detections: $minDetections");
-    } catch (e) {
-      debugPrint("❌ [iOS DEBUG] Error loading model: $e");
-      debugPrint("❌ [iOS DEBUG] Stack trace: ${StackTrace.current}");
-      throw Exception("Failed to load AI model: $e");
-    }
+    _interpreter = await Interpreter.fromAsset(
+      'assets/model/best_float32.tflite',
+    );
+    _labels =
+        (await rootBundle.loadString(
+          'assets/model/labels.txt',
+        )).split('\n').where((e) => e.trim().isNotEmpty).toList();
   }
 
   Future<String> predict(File imageFile) async {
-    try {
-      debugPrint("🔍 [iOS DEBUG] Starting prediction...");
-      debugPrint("🔍 [iOS DEBUG] Platform: ${Platform.operatingSystem}");
-      debugPrint("🔍 [iOS DEBUG] Image file path: ${imageFile.path}");
-      debugPrint("🔍 [iOS DEBUG] Image file exists: ${await imageFile.exists()}");
-      
-      final bytes = await imageFile.readAsBytes();
-      debugPrint("🔍 [iOS DEBUG] Image bytes length: ${bytes.length}");
-      
-      final raw = img.decodeImage(bytes);
-      if (raw == null) {
-        debugPrint("❌ [iOS DEBUG] Failed to decode image");
-        return "Invalid image";
-      }
-      
-      debugPrint("🔍 [iOS DEBUG] Original image size: ${raw.width}x${raw.height}");
-      debugPrint("🔍 [iOS DEBUG] Original image format: ${raw.format}");
-      debugPrint("🔍 [iOS DEBUG] Original image channels: ${raw.numChannels}");
+    final bytes = await imageFile.readAsBytes();
+    final raw = img.decodeImage(bytes);
+    if (raw == null) return "Invalid image";
 
-      // Handle orientation and resize
-      final oriented = img.bakeOrientation(raw);
-      debugPrint("🔍 [iOS DEBUG] After bakeOrientation: ${oriented.width}x${oriented.height}");
-      
-      final resized = img.copyResize(oriented, width: inputSize, height: inputSize);
-      debugPrint("🔍 [iOS DEBUG] After resize: ${resized.width}x${resized.height}");
+    final resized = img.copyResize(raw, width: inputSize, height: inputSize);
 
-      // Build input: shape [1, 640, 640, 3] using Float32List for better performance
-      debugPrint("🔍 [iOS DEBUG] Building input tensor...");
-      var input = Float32List(1 * inputSize * inputSize * 3);
-      var buffer = 0;
-      for (var y = 0; y < inputSize; y++) {
-        for (var x = 0; x < inputSize; x++) {
+    // Build input: shape [1, 640, 640, 3]
+    List<List<List<List<double>>>> input = List.generate(
+      1,
+      (_) => List.generate(inputSize, (y) {
+        return List.generate(inputSize, (x) {
           final pixel = resized.getPixel(x, y);
-          input[buffer++] = pixel.r / 255.0;
-          input[buffer++] = pixel.g / 255.0;
-          input[buffer++] = pixel.b / 255.0;
-        }
+          final r = pixel.r / 255.0;
+          final g = pixel.g / 255.0;
+          final b = pixel.b / 255.0;
+          return [r, g, b];
+        });
+      }),
+    );
+
+    // Correct output buffer: shape [1, 5, 8400]
+    final output = List.generate(
+      1,
+      (_) => List.generate(5, (_) => List.filled(8400, 0.0)),
+    );
+
+    _interpreter.run(input, output);
+
+    final results = output[0]; // Shape: [5, 8400]
+    String? topLabel;
+    double maxConfidence = 0.0;
+
+    for (int i = 0; i < 8400; i++) {
+      final confidence = results[4][i];
+
+      if (confidence < confidenceThreshold) continue;
+      if (confidence > maxConfidence) {
+        maxConfidence = confidence;
+        topLabel = _labels.isNotEmpty ? _labels[0] : "Pothole";
       }
-      final reshapedInput = input.reshape([1, inputSize, inputSize, 3]);
-      debugPrint("🔍 [iOS DEBUG] Input tensor created: ${reshapedInput.length} elements");
+    }
 
-      // Get output tensor info
-      final outputTensors = _interpreter.getOutputTensors();
-      final outputShape = outputTensors[0].shape;
-      final numBoxes = outputShape.contains(8400) ? 8400 : outputShape[1];
-      final numElements = outputShape.contains(8400) 
-          ? (outputShape[1] == 8400 ? outputShape[2] : outputShape[1])
-          : outputShape[2];
-      
-      debugPrint("🔍 [iOS DEBUG] Output shape: $outputShape");
-      debugPrint("🔍 [iOS DEBUG] Detected boxes: $numBoxes");
-      debugPrint("🔍 [iOS DEBUG] Elements per box: $numElements");
-      debugPrint("🔍 [iOS DEBUG] Confidence threshold: $confidenceThreshold");
-      debugPrint("🔍 [iOS DEBUG] Min detections required: $minDetections");
-
-      double maxConfidence = 0.0;
-      int highConfidenceCount = 0;
-      List<double> allConfidences = [];
-
-      // Dynamic output buffer based on shape
-      if (outputShape[1] < outputShape[2]) {
-        debugPrint("🔍 [iOS DEBUG] Using format [1, elements, boxes]");
-        // Format: [1, elements, boxes] (e.g. [1, 6, 8400])
-        final output = List.generate(
-          1,
-          (_) => List.generate(outputShape[1], (_) => List.filled(outputShape[2], 0.0)),
-        );
-        
-        debugPrint("🔍 [iOS DEBUG] Running inference...");
-        _interpreter.run(reshapedInput, output);
-        debugPrint("🔍 [iOS DEBUG] Inference completed");
-        
-        final results = output[0];
-        final boxes = outputShape[2];
-        
-        // In YOLOv8, index 4 is the first class score
-        for (int i = 0; i < boxes; i++) {
-          final confidence = results[4][i];
-          allConfidences.add(confidence);
-          if (confidence > confidenceThreshold) {
-            highConfidenceCount++;
-            debugPrint("🔍 [iOS DEBUG] High confidence detection $highConfidenceCount: $confidence at box $i");
-          }
-          if (confidence > maxConfidence) {
-            maxConfidence = confidence;
-          }
-        }
-      } else {
-        debugPrint("🔍 [iOS DEBUG] Using format [1, boxes, elements]");
-        // Format: [1, boxes, elements] (e.g. [1, 8400, 6])
-        final output = List.generate(
-          1,
-          (_) => List.generate(outputShape[1], (_) => List.filled(outputShape[2], 0.0)),
-        );
-        
-        debugPrint("🔍 [iOS DEBUG] Running inference...");
-        _interpreter.run(reshapedInput, output);
-        debugPrint("🔍 [iOS DEBUG] Inference completed");
-        
-        final results = output[0];
-        final boxes = outputShape[1];
-        
-        for (int i = 0; i < boxes; i++) {
-          final confidence = results[i][4];
-          allConfidences.add(confidence);
-          if (confidence > confidenceThreshold) {
-            highConfidenceCount++;
-            debugPrint("🔍 [iOS DEBUG] High confidence detection $highConfidenceCount: $confidence at box $i");
-          }
-          if (confidence > maxConfidence) {
-            maxConfidence = confidence;
-          }
-        }
-      }
-
-      // Sort confidences to see top detections
-      allConfidences.sort((a, b) => b.compareTo(a));
-      debugPrint("🔍 [iOS DEBUG] Top 10 confidences: ${allConfidences.take(10).toList()}");
-      debugPrint("🔍 [iOS DEBUG] Max confidence: $maxConfidence");
-      debugPrint("🔍 [iOS DEBUG] High confidence count: $highConfidenceCount");
-      debugPrint("🔍 [iOS DEBUG] Threshold check: maxConfidence ($maxConfidence) >= confidenceThreshold ($confidenceThreshold) = ${maxConfidence >= confidenceThreshold}");
-      debugPrint("🔍 [iOS DEBUG] Count check: highConfidenceCount ($highConfidenceCount) >= minDetections ($minDetections) = ${highConfidenceCount >= minDetections}");
-
-      bool isPotholeDetected =
-          maxConfidence >= confidenceThreshold &&
-          highConfidenceCount >= minDetections;
-
-      debugPrint("🔍 [iOS DEBUG] Final detection result: $isPotholeDetected");
-
-      if (isPotholeDetected) {
-        final label = _labels.isNotEmpty ? _labels[0] : "Pothole";
-        final percentage = (maxConfidence * 100).toStringAsFixed(1);
-        final result = "$label detected ($percentage%)";
-        debugPrint("✅ [iOS DEBUG] Pothole detected: $result");
-        return result;
-      } else {
-        final result = "No pothole detected";
-        debugPrint("❌ [iOS DEBUG] No pothole detected - maxConf: $maxConfidence, count: $highConfidenceCount");
-        return result;
-      }
-    } catch (e) {
-      debugPrint("❌ [iOS DEBUG] Prediction error: $e");
-      debugPrint("❌ [iOS DEBUG] Stack trace: ${StackTrace.current}");
-      return "Error processing image";
+    if (topLabel != null && (maxConfidence * 100) > 50.0) {
+      return "$topLabel (${(maxConfidence * 100).toStringAsFixed(2)}%)";
+    } else {
+      return "$topLabel";
     }
   }
 
   // New method to run prediction in background isolate
   Future<String> predictInBackground(File imageFile) async {
-    // Instead of using compute (which creates a new isolate and can't access assets),
-    // just run the prediction on the main isolate but asynchronously
-    // The actual heavy computation is in TFLite which runs natively anyway
     return await predict(imageFile);
   }
 
