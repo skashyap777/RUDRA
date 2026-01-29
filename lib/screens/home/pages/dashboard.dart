@@ -427,18 +427,72 @@ class _DashboardState extends State<Dashboard> {
 class PotholeDetector {
   late Interpreter _interpreter;
   late List<String> _labels;
+  String? _lastError; // Store detailed error info
+  bool _isLoaded = false;
 
   final int inputSize = 640;
   final double confidenceThreshold = 0.3;
 
+  // Get detailed error information
+  String get lastError => _lastError ?? "No error information available";
+  bool get isLoaded => _isLoaded;
+
   Future<void> loadModel() async {
-    _interpreter = await Interpreter.fromAsset(
-      'assets/model/best_float32.tflite',
-    );
-    _labels =
-        (await rootBundle.loadString(
-          'assets/model/labels.txt',
-        )).split('\n').where((e) => e.trim().isNotEmpty).toList();
+    try {
+      _lastError = null;
+      debugPrint("🔄 [DEBUG] Starting model loading...");
+      debugPrint("🔄 [DEBUG] Platform: ${Platform.operatingSystem}");
+      
+      // Check if model file exists
+      try {
+        final modelBytes = await rootBundle.load('assets/model/best_float32.tflite');
+        debugPrint("✅ [DEBUG] Model file found: ${modelBytes.lengthInBytes} bytes");
+      } catch (e) {
+        _lastError = "Model file 'assets/model/best_float32.tflite' not found: $e";
+        throw Exception(_lastError);
+      }
+      
+      // Check if labels file exists
+      try {
+        final labelsString = await rootBundle.loadString('assets/model/labels.txt');
+        debugPrint("✅ [DEBUG] Labels file found: ${labelsString.length} characters");
+      } catch (e) {
+        _lastError = "Labels file 'assets/model/labels.txt' not found: $e";
+        throw Exception(_lastError);
+      }
+      
+      // Load TFLite interpreter
+      try {
+        _interpreter = await Interpreter.fromAsset('assets/model/best_float32.tflite');
+        debugPrint("✅ [DEBUG] TFLite interpreter created successfully");
+      } catch (e) {
+        _lastError = "Failed to create TFLite interpreter (TensorFlow Lite library issue): $e";
+        throw Exception(_lastError);
+      }
+      
+      // Load labels
+      try {
+        _labels = (await rootBundle.loadString('assets/model/labels.txt'))
+            .split('\n')
+            .where((e) => e.trim().isNotEmpty)
+            .toList();
+        debugPrint("✅ [DEBUG] Labels loaded: ${_labels.length} labels: $_labels");
+      } catch (e) {
+        _lastError = "Failed to parse labels file: $e";
+        throw Exception(_lastError);
+      }
+      
+      _isLoaded = true;
+      debugPrint("✅ [DEBUG] Model loaded successfully!");
+      
+    } catch (e) {
+      _isLoaded = false;
+      if (_lastError == null) {
+        _lastError = "Unknown error: $e";
+      }
+      debugPrint("❌ [DEBUG] Model loading failed: $_lastError");
+      throw Exception("AI Model Loading Failed: $_lastError");
+    }
   }
 
   Future<String> predict(File imageFile) async {

@@ -61,11 +61,14 @@ class _ScanPothholeState extends State<ScanPothhole>
       if (mounted) {
         setState(() {
           _isInitializing = false;
-          _initError = e.toString();
+          // Show detailed error from detector
+          _initError = detector.lastError.isNotEmpty 
+              ? detector.lastError 
+              : e.toString();
         });
         AppFunctions.showCustomSnackBar(
           context,
-          "AI Model failed to load. Please try again.",
+          "AI Model failed: ${detector.lastError}",
           backgroundColor: Colors.red,
         );
       }
@@ -241,10 +244,13 @@ class _ScanPothholeState extends State<ScanPothhole>
             padding: const EdgeInsets.symmetric(horizontal: 30.0),
             child: Text(
               _initError != null
-                  ? "Error: $_initError"
+                  ? "Detailed Error:\n$_initError\n\nThis helps identify if the issue is:\n• Missing model files\n• TensorFlow Lite library\n• File permissions\n• Other causes"
                   : "Please hold steady. We're analyzing the image to detect a road issue.",
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.black54, fontSize: 13),
+              style: TextStyle(
+                color: _initError != null ? Colors.red[700] : Colors.black54, 
+                fontSize: _initError != null ? 12 : 13,
+              ),
             ),
           ),
           if (_initError != null)
