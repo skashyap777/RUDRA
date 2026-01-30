@@ -442,55 +442,122 @@ class PotholeDetector {
       _lastError = null;
       debugPrint("🔄 [DEBUG] Starting model loading...");
       debugPrint("🔄 [DEBUG] Platform: ${Platform.operatingSystem}");
+      debugPrint("🔄 [DEBUG] Platform.isIOS: ${Platform.isIOS}");
+      debugPrint("🔄 [DEBUG] Platform.isAndroid: ${Platform.isAndroid}");
       
-      // Check if model file exists
+      // Check Flutter environment
+      debugPrint("🔄 [DEBUG] Flutter.framework available: ${Platform.environment.containsKey('FLUTTER_ROOT')}");
+      debugPrint("🔄 [DEBUG] Current working directory: ${Directory.current.path}");
+      
+      // Check if assets exist with detailed info
       try {
         final modelBytes = await rootBundle.load('assets/model/best_float32.tflite');
         debugPrint("✅ [DEBUG] Model file found: ${modelBytes.lengthInBytes} bytes");
+        debugPrint("✅ [DEBUG] Model file buffer type: ${modelBytes.runtimeType}");
+        
+        // Try to access the raw bytes to ensure it's valid
+        final firstBytes = modelBytes.buffer.asUint8List(0, 10);
+        debugPrint("✅ [DEBUG] Model file first 10 bytes: $firstBytes");
       } catch (e) {
-        _lastError = "Model file 'assets/model/best_float32.tflite' not found: $e";
+        _lastError = "Model file 'assets/model/best_float32.tflite' not found or corrupted: $e";
+        debugPrint("❌ [DEBUG] Model file error: $_lastError");
         throw Exception(_lastError);
       }
       
-      // Check if labels file exists
+      // Check labels file
       try {
         final labelsString = await rootBundle.loadString('assets/model/labels.txt');
         debugPrint("✅ [DEBUG] Labels file found: ${labelsString.length} characters");
+        debugPrint("✅ [DEBUG] Labels content: '$labelsString'");
       } catch (e) {
         _lastError = "Labels file 'assets/model/labels.txt' not found: $e";
+        debugPrint("❌ [DEBUG] Labels file error: $_lastError");
         throw Exception(_lastError);
       }
       
-      // Load TFLite interpreter
+      // Check TensorFlow Lite library availability
+      debugPrint("🔄 [DEBUG] Checking TensorFlow Lite library availability...");
       try {
+        // Try to import tflite_flutter to see if it's available
+        debugPrint("🔄 [DEBUG] Attempting to create Interpreter...");
+        debugPrint("🔄 [DEBUG] Using asset path: 'assets/model/best_float32.tflite'");
+        
         _interpreter = await Interpreter.fromAsset('assets/model/best_float32.tflite');
-        debugPrint("✅ [DEBUG] TFLite interpreter created successfully");
+        debugPrint("✅ [DEBUG] TFLite interpreter created successfully!");
+        
+        // Get interpreter details
+        try {
+          final inputTensors = _interpreter.getInputTensors();
+          final outputTensors = _interpreter.getOutputTensors();
+          debugPrint("✅ [DEBUG] Input tensors count: ${inputTensors.length}");
+          debugPrint("✅ [DEBUG] Output tensors count: ${outputTensors.length}");
+          
+          if (inputTensors.isNotEmpty) {
+            debugPrint("✅ [DEBUG] Input tensor 0 shape: ${inputTensors[0].shape}");
+            debugPrint("✅ [DEBUG] Input tensor 0 type: ${inputTensors[0].type}");
+          }
+          
+          if (outputTensors.isNotEmpty) {
+            debugPrint("✅ [DEBUG] Output tensor 0 shape: ${outputTensors[0].shape}");
+            debugPrint("✅ [DEBUG] Output tensor 0 type: ${outputTensors[0].type}");
+          }
+        } catch (e) {
+          debugPrint("⚠️ [DEBUG] Could not get tensor info: $e");
+        }
+        
       } catch (e) {
-        _lastError = "Failed to create TFLite interpreter (TensorFlow Lite library issue): $e";
+        _lastError = "Failed to create TFLite interpreter. This indicates TensorFlow Lite library is not properly linked. Error: $e";
+        debugPrint("❌ [DEBUG] TFLite interpreter creation failed: $_lastError");
+        debugPrint("❌ [DEBUG] Error type: ${e.runtimeType}");
+        debugPrint("❌ [DEBUG] Full error details: $e");
+        
+        // Check if it's the specific symbol error
+        if (e.toString().contains('TfLiteModelCreate') || e.toString().contains('symbol not found')) {
+          _lastError = "TensorFlow Lite C library symbols missing. The TfLiteModelCreate symbol is not found, which means:\n"
+              "1. TensorFlowLiteC pod is not properly installed\n"
+              "2. TensorFlowLiteC library is not linked at runtime\n"
+              "3. The tflite_flutter plugin cannot access native TFLite functions\n"
+              "Original error: $e";
+        }
+        
         throw Exception(_lastError);
       }
       
-      // Load labels
+      // Load labels with detailed parsing
       try {
-        _labels = (await rootBundle.loadString('assets/model/labels.txt'))
+        final labelsString = await rootBundle.loadString('assets/model/labels.txt');
+        _labels = labelsString
             .split('\n')
-            .where((e) => e.trim().isNotEmpty)
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
             .toList();
-        debugPrint("✅ [DEBUG] Labels loaded: ${_labels.length} labels: $_labels");
+        
+        debugPrint("✅ [DEBUG] Labels parsed successfully: ${_labels.length} labels");
+        debugPrint("✅ [DEBUG] Labels: $_labels");
+        
+        if (_labels.isEmpty) {
+          _lastError = "Labels file is empty or contains no valid labels";
+          throw Exception(_lastError);
+        }
+        
       } catch (e) {
         _lastError = "Failed to parse labels file: $e";
+        debugPrint("❌ [DEBUG] Labels parsing failed: $_lastError");
         throw Exception(_lastError);
       }
       
       _isLoaded = true;
       debugPrint("✅ [DEBUG] Model loaded successfully!");
+      debugPrint("✅ [DEBUG] Confidence threshold: $confidenceThreshold");
+      debugPrint("✅ [DEBUG] Ready for predictions!");
       
     } catch (e) {
       _isLoaded = false;
       if (_lastError == null) {
-        _lastError = "Unknown error: $e";
+        _lastError = "Unknown error during model loading: $e";
       }
       debugPrint("❌ [DEBUG] Model loading failed: $_lastError");
+      debugPrint("❌ [DEBUG] Stack trace: ${StackTrace.current}");
       throw Exception("AI Model Loading Failed: $_lastError");
     }
   }

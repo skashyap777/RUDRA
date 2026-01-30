@@ -62,10 +62,24 @@ workflows:
           if [ -d "Pods/TensorFlowLiteC" ]; then
             echo "✅ TensorFlowLiteC pod installed successfully"
             ls -la Pods/TensorFlowLiteC/
+            echo "🔍 Checking TensorFlowLiteC library files..."
+            find Pods/TensorFlowLiteC -name "*.a" -o -name "*.dylib" -o -name "*.framework" | head -10
           else
             echo "❌ TensorFlowLiteC pod NOT found - AI model will fail!"
             exit 1
           fi
+          
+          echo "🔍 Verifying TensorFlowLiteSwift installation..."
+          if [ -d "Pods/TensorFlowLiteSwift" ]; then
+            echo "✅ TensorFlowLiteSwift pod installed successfully"
+            ls -la Pods/TensorFlowLiteSwift/
+          else
+            echo "❌ TensorFlowLiteSwift pod NOT found!"
+            exit 1
+          fi
+          
+          echo "🔍 Checking all installed pods..."
+          cat Podfile.lock | grep -A 5 -B 5 "TensorFlow" || echo "No TensorFlow pods found in Podfile.lock"
           cd ..
       
       - name: Flutter analyze
