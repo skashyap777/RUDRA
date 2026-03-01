@@ -1,8 +1,12 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:rudra/config/constants/api_constants.dart';
 import 'package:rudra/config/theme/app_pallet.dart';
 import 'package:rudra/config/utils/assets.dart';
 import 'package:rudra/config/utils/local_storage.dart';
+import 'package:rudra/screens/profile/pages/info_screen.dart';
 import 'package:rudra/screens/profile/provider/profile_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -74,7 +78,7 @@ class _ProfileState extends State<Profile> {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(40),
                           child: Image.network(
-                            "${Constants.baseUrl}${profile?.profilePhotoLink}",
+                            "${ApiConstants.imageBaseUrl}${profile?.profilePhotoLink}",
                             fit: BoxFit.cover,
                             width: 70,
                             height: 70,
@@ -174,45 +178,37 @@ class _ProfileState extends State<Profile> {
                   child: Column(
                     children: [
                       _buildListTile(
+                        icon: Icons.info_outline_rounded,
+                        title: "About PWD Assam Initiative",
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          Navigator.push(context,
+                              CupertinoPageRoute(builder: (_) => const AboutPWDScreen()));
+                        },
+                      ),
+                      _buildDivider(),
+                      _buildListTile(
                         icon: Icons.description_outlined,
                         title: "Terms & Conditions",
-                        onTap: () {}, // Add navigation if needed
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          Navigator.push(context,
+                              CupertinoPageRoute(builder: (_) => const TermsAndConditionsScreen()));
+                        },
                       ),
                       _buildDivider(),
                       _buildListTile(
                         icon: Icons.privacy_tip_outlined,
                         title: "Privacy Policy",
-                        onTap: () {}, // Add navigation if needed
-                      ),
-                      _buildDivider(),
-                      _buildListTile(
-                        icon: Icons.headset_mic_outlined,
-                        title: "Contact Support",
-                        onTap: () {}, // Add navigation if needed
-                      ),
-                      _buildDivider(),
-                      _buildListTile(
-                        icon: Icons.info_outline_rounded,
-                        title: "About PWD Assam Initiative",
-                        onTap: () {}, // Add navigation if needed
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          Navigator.push(context,
+                              CupertinoPageRoute(builder: (_) => const PrivacyPolicyScreen()));
+                        },
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
-
-                // Version
-                Center(
-                  child: Text(
-                    "App Version 1.0.5",
-                    style: TextStyle(
-                      color: Colors.grey.withOpacity(0.6),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
               ],
             ),
           );

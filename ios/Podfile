@@ -32,11 +32,11 @@ target 'Runner' do
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-  
-  # Explicitly add TensorFlow Lite C library for tflite_flutter
+
+  # Force link the TFLite native libraries (Fixes "symbol not found" on iOS)
   pod 'TensorFlowLiteC', '2.12.0'
   pod 'TensorFlowLiteSwift', '2.12.0'
-  
+
   target 'RunnerTests' do
     inherit! :search_paths
   end
@@ -45,5 +45,9 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      config.build_settings['STRIP_STYLE'] = 'non-global'
+    end
   end
 end

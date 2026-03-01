@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:rudra/config/utils/app_functions.dart';
 import 'package:rudra/screens/auth/provider/auth_provide.dart';
+import 'package:rudra/screens/home/provider/home_provider.dart';
 import 'package:provider/provider.dart';
 
 class CompleteProfileScreen extends StatefulWidget {
@@ -126,7 +127,10 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
         final res = await provider.createProfile(formData);
         if (res) {
-          context.push("/welcome");
+          if (context.mounted) {
+            Provider.of<HomeProvider>(context, listen: false).getUserDetails();
+            context.push("/welcome");
+          }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(

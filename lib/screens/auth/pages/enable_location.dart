@@ -1,5 +1,6 @@
 import 'dart:developer';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
@@ -47,7 +48,7 @@ class _EnableLocationState extends State<EnableLocation> {
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child:
                   loading
-                      ? Center(child: CircularProgressIndicator())
+                      ? const Center(child: CircularProgressIndicator.adaptive())
                       : Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -132,26 +133,29 @@ class _EnableLocationState extends State<EnableLocation> {
                                   }
                                 } else {
                                   // Show dialog requiring location permission
-                                  showDialog(
+                                  showCupertinoDialog(
                                     context: context,
-                                    builder:
-                                        (context) => AlertDialog(
-                                          title: const Text(
-                                            'Location Permission Required',
-                                          ),
-                                          content: const Text(
-                                            'This app requires location access to verify your area within PWD Assam jurisdiction. Please grant location permission to continue.',
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () async {
-                                                Navigator.pop(context);
-                                                await getCurrentLocation();
-                                              },
-                                              child: const Text('Try Again'),
-                                            ),
-                                          ],
+                                    builder: (context) => CupertinoAlertDialog(
+                                      title: const Text(
+                                        'Location Permission Required',
+                                      ),
+                                      content: const Padding(
+                                        padding: EdgeInsets.only(top: 8),
+                                        child: Text(
+                                          'This app requires location access to verify your area within PWD Assam jurisdiction. Please grant location permission to continue.',
                                         ),
+                                      ),
+                                      actions: [
+                                        CupertinoDialogAction(
+                                          isDefaultAction: true,
+                                          onPressed: () async {
+                                            Navigator.pop(context);
+                                            await getCurrentLocation();
+                                          },
+                                          child: const Text('Try Again'),
+                                        ),
+                                      ],
+                                    ),
                                   );
                                 }
                               }

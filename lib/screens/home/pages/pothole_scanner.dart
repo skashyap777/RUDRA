@@ -2,8 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:rudra/config/theme/app_pallet.dart';
 import 'package:rudra/screens/home/provider/home_provider.dart';
@@ -51,68 +55,101 @@ class _AddPotholeState extends State<AddPothole> {
 
   Future<void> _getCurrentLocation() async {
     try {
-      // Check if location services are enabled
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
+      final provider = Provider.of<HomeProvider>(context, listen: false);
+      if (provider.coordinates.isNotEmpty) {
+        final lastCoord = provider.coordinates.last;
+        final lat = lastCoord['latitude'] as double;
+        final lng = lastCoord['longitude'] as double;
         setState(() {
+          _currentPosition = Position(
+            longitude: lng,
+            latitude: lat,
+            timestamp: DateTime.now(),
+            accuracy: 0.0,
+            altitude: 0.0,
+            altitudeAccuracy: 0.0,
+            heading: 0.0,
+            headingAccuracy: 0.0,
+            speed: 0.0,
+            speedAccuracy: 0.0,
+            floor: null,
+            isMocked: false,
+          );
           _isLoadingLocation = false;
+          _markers = {
+            Marker(
+              markerId: const MarkerId('current_location'),
+              position: LatLng(lat, lng),
+              infoWindow: const InfoWindow(
+                title: 'Pothole Location',
+                snippet: 'Detected pothole at this location',
+              ),
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueRed,
+              ),
+            ),
+          };
         });
-        _showLocationError('Location services are disabled.');
-        return;
-      }
 
-      // Check location permissions
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
+        if (_mapController != null) {
+          _mapController!.animateCamera(
+            CameraUpdate.newLatLngZoom(LatLng(lat, lng), 16.0),
+          );
+        }
+
+        // --- NEW: Perform reverse geocoding to pre-fill the Area field ---
+        try {
+          // Use geocoding to get the placemark based on the coordinates
+          List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
+          if (placemarks.isNotEmpty) {
+            Placemark place = placemarks.first;
+            
+            // Generate a readable address from the placemark components
+            List<String> addressParts = [];
+            
+            // Build something like: "Beltola Tiniali, Bhagaduttapur, Guwahati, Assam 781028, India"
+            if (place.street != null && place.street!.isNotEmpty) addressParts.add(place.street!);
+            if (place.subLocality != null && place.subLocality!.isNotEmpty) addressParts.add(place.subLocality!);
+            if (place.locality != null && place.locality!.isNotEmpty) addressParts.add(place.locality!);
+            
+            // Fallbacks if some properties are null
+            if (addressParts.isEmpty && place.subAdministrativeArea != null) addressParts.add(place.subAdministrativeArea!);
+            
+            if (place.administrativeArea != null && place.administrativeArea!.isNotEmpty) {
+              String statePart = place.administrativeArea!;
+              if (place.postalCode != null && place.postalCode!.isNotEmpty) {
+                statePart += ' ${place.postalCode}';
+              }
+              addressParts.add(statePart);
+            }
+            if (place.country != null && place.country!.isNotEmpty) addressParts.add(place.country!);
+
+            String fullAddress = addressParts.join(', ');
+            
+            // Update the area controller which drives the text field
+            if (fullAddress.isNotEmpty && mounted) {
+              setState(() {
+                _areaController.text = fullAddress;
+              });
+            }
+          }
+        } catch (e) {
+          debugPrint("Failed to fetch address via geocoding: $e");
+          // If geocoding fails, it will safely ignore and leave the text field empty (or user can write manually)
+        }
+        // -----------------------------------------------------------------
+
+      } else {
+        // Fallback or retry: attempt gathering using provider
+        await provider.addCurrentCordinate();
+        if (provider.coordinates.isNotEmpty) {
+           _getCurrentLocation();
+        } else {
           setState(() {
             _isLoadingLocation = false;
           });
-          _showLocationError('Location permissions are denied');
-          return;
+          _showLocationError('Location not available. Please retry.');
         }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        setState(() {
-          _isLoadingLocation = false;
-        });
-        _showLocationError('Location permissions are permanently denied');
-        return;
-      }
-
-      // Get current position
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-
-      setState(() {
-        _currentPosition = position;
-        _isLoadingLocation = false;
-        _markers = {
-          Marker(
-            markerId: MarkerId('current_location'),
-            position: LatLng(position.latitude, position.longitude),
-            infoWindow: InfoWindow(
-              title: 'Pothole Location',
-              snippet: 'Detected pothole at this location',
-            ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-              BitmapDescriptor.hueRed,
-            ),
-          ),
-        };
-      });
-
-      // Move camera to current location
-      if (_mapController != null) {
-        _mapController!.animateCamera(
-          CameraUpdate.newLatLngZoom(
-            LatLng(position.latitude, position.longitude),
-            16.0,
-          ),
-        );
       }
     } catch (e) {
       setState(() {
@@ -155,21 +192,22 @@ class _AddPotholeState extends State<AddPothole> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: double.infinity,
-                          height: 150,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.red, width: 2),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.file(
-                              provider.potholeImages[index],
-                              fit: BoxFit.cover,
+                        if (provider.potholeImages.isNotEmpty)
+                          Container(
+                            width: double.infinity,
+                            height: 150,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.red, width: 2),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.file(
+                                provider.potholeImages[index < provider.potholeImages.length ? index : 0],
+                                fit: BoxFit.cover,
+                              ),
                             ),
                           ),
-                        ),
                         SizedBox(height: 20),
                         if (provider.potholeImages.length > 1)
                           Row(
@@ -240,20 +278,22 @@ class _AddPotholeState extends State<AddPothole> {
                                           child: Column(
                                             mainAxisAlignment:
                                                 MainAxisAlignment.center,
+                                            mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Icon(
                                                 Icons.location_off,
                                                 color: Colors.grey[600],
-                                                size: 32,
+                                                size: 28,
                                               ),
-                                              SizedBox(height: 8),
+                                              SizedBox(height: 4),
                                               Text(
                                                 'Location not available',
                                                 style: TextStyle(
                                                   color: Colors.grey[600],
+                                                  fontSize: 12,
                                                 ),
                                               ),
-                                              SizedBox(height: 8),
+                                              SizedBox(height: 4),
                                               ElevatedButton(
                                                 onPressed: _getCurrentLocation,
                                                 style: ElevatedButton.styleFrom(
@@ -261,8 +301,16 @@ class _AddPotholeState extends State<AddPothole> {
                                                     0xFF4CAF50,
                                                   ),
                                                   foregroundColor: Colors.white,
+                                                  padding: EdgeInsets.symmetric(
+                                                    horizontal: 16,
+                                                    vertical: 8,
+                                                  ),
+                                                  minimumSize: Size(0, 32),
                                                 ),
-                                                child: const Text('Retry'),
+                                                child: const Text(
+                                                  'Retry',
+                                                  style: TextStyle(fontSize: 12),
+                                                ),
                                               ),
                                             ],
                                           ),
@@ -459,13 +507,47 @@ class _AddPotholeState extends State<AddPothole> {
       }
 
       String coordinatesJson = jsonEncode(provider.coordinates);
-      FormData formData = FormData.fromMap({
+
+      // Build form data — strip out accuracy from coordinates since it's a separate field
+      final coordsForServer = [];
+      for (var i = 0; i < provider.potholeImages.length; i++) {
+        if (i < provider.coordinates.length) {
+          coordsForServer.add({
+            "latitude": provider.coordinates[i]["latitude"],
+            "longitude": provider.coordinates[i]["longitude"],
+          });
+        } else if (provider.coordinates.isNotEmpty) {
+          // Duplicate last coordinate for remaining images safely
+          coordsForServer.add({
+            "latitude": provider.coordinates.last["latitude"],
+            "longitude": provider.coordinates.last["longitude"],
+          });
+        } else {
+          // Fallback if no location data exists
+          coordsForServer.add({
+            "latitude": _currentPosition?.latitude ?? 0.0,
+            "longitude": _currentPosition?.longitude ?? 0.0,
+          });
+        }
+      }
+      
+      String coordinatesJsonClean = jsonEncode(coordsForServer);
+
+      Map<String, dynamic> formMap = {
         "potholeImages": potholeImages,
-        "coordinates": coordinatesJson,
+        "coordinates": coordinatesJsonClean,
         "area_details": _areaController.text,
         "landmark": _landmarkController.text,
         "remarks": _remarkController.text,
-      });
+        "severity": "Low",
+      };
+
+      // Include GPS accuracy if available
+      if (provider.lastAccuracy != null) {
+        formMap["accuracy"] = double.parse(provider.lastAccuracy!.toStringAsFixed(2));
+      }
+
+      FormData formData = FormData.fromMap(formMap);
 
       Map<String, dynamic> result = await provider.createPothole(formData);
 
@@ -499,22 +581,28 @@ class _AddPotholeState extends State<AddPothole> {
   }
 
   void _showReportDialog(BuildContext context, bool success, String message) {
-    showDialog(
+    HapticFeedback.mediumImpact();
+    showCupertinoDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(success ? 'Success' : 'Error'),
-          content: Text(message),
+        return CupertinoAlertDialog(
+          title: Text(success ? '✅ Success' : '❌ Error'),
+          content: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(message),
+          ),
           actions: [
-            TextButton(
+            CupertinoDialogAction(
+              isDefaultAction: true,
               onPressed: () {
                 Navigator.of(context).pop();
                 if (success) {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
+                  Provider.of<HomeProvider>(context, listen: false).clearReportData();
+                  context.go('/home');
                 }
               },
-              child: Text('OK'),
+              child: const Text('OK'),
             ),
           ],
         );

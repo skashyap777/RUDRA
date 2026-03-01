@@ -4,6 +4,7 @@ import 'package:pinput/pinput.dart';
 import 'package:rudra/config/theme/app_pallet.dart';
 import 'package:rudra/config/utils/assets.dart';
 import 'package:rudra/screens/auth/provider/auth_provide.dart';
+import 'package:rudra/screens/home/provider/home_provider.dart';
 import 'package:provider/provider.dart';
 
 class OtpEnterScreen extends StatefulWidget {
@@ -43,17 +44,34 @@ class _OtpEnterScreenState extends State<OtpEnterScreen> {
                 const SizedBox(height: 24),
                 Pinput(length: 6, controller: _otpController),
                 SizedBox(height: 10),
-                RichText(
-                  text: TextSpan(
-                    text: "Didn’t receive OTP ?",
-                    style: TextStyle(color: Colors.black),
-                    children: [
-                      TextSpan(
-                        text: " RESEND",
-                        style: TextStyle(color: AppPallet.buttonColor),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      "Didn't receive OTP? ",
+                      style: TextStyle(color: Colors.black),
+                    ),
+                    GestureDetector(
+                      onTap: () async {
+                        final res = await store.resendOtp(widget.mobileNumber);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                           SnackBar(
+                             content: Text(res ? 'OTP Resent Successfully!' : 'Failed to resend OTP.'),
+                             backgroundColor: res ? Colors.green : Colors.red,
+                           ),
+                          );
+                        }
+                      },
+                      child: const Text(
+                        "RESEND",
+                        style: TextStyle(
+                          color: AppPallet.buttonColor,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
                 SizedBox(height: 20),
 
@@ -74,6 +92,10 @@ class _OtpEnterScreenState extends State<OtpEnterScreen> {
                     if (res) {
                       final res = await store.getProfileData();
                       if (res) {
+                        // Refresh HomeProvider before navigating so Dashboard is ready
+                        if (context.mounted) {
+                          Provider.of<HomeProvider>(context, listen: false).getUserDetails();
+                        }
                         if (store.profile!.data!.profile!.name != null &&
                             store.profile!.data!.profile!.name!.isNotEmpty) {
                           context.push("/home");

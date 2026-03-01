@@ -17,6 +17,12 @@ class HomeProvider extends ChangeNotifier {
   List<Map<String, double>> coordinates = [];
   bool loading = true;
 
+  void clearReportData() {
+    potholeImages.clear();
+    coordinates.clear();
+    notifyListeners();
+  }
+
   Future<Map<String, dynamic>> createPothole(FormData formData) async {
     try {
       final response = await apiService.postMultipart(
@@ -28,50 +34,54 @@ class HomeProvider extends ChangeNotifier {
       }
       return {'success': false, 'message': 'Failed to submit report'};
     } on DioException catch (e) {
-      // Handle specific error responses from server
-      if (e.response != null && e.response?.statusCode == 400) {
-        try {
-          final errorData = e.response?.data;
-          if (errorData is Map && errorData['message'] != null) {
-            // Extract the server error message
-            String message = errorData['message'];
-            String? existingCaseNo = errorData['data']?['existing_case_no'];
-
-            if (existingCaseNo != null) {
-              message += '\n\nExisting Case: $existingCaseNo';
-            }
-
-            return {'success': false, 'message': message};
+      if (e.response != null) {
+        final statusCode = e.response?.statusCode;
+        final errorData = e.response?.data;
+        String message = 'Server Error ($statusCode)';
+        
+        if (errorData is Map && errorData['message'] != null) {
+          message = errorData['message'];
+          // Handle existing case logic
+          String? existingCaseNo = errorData['data']?['existing_case_no'];
+          if (existingCaseNo != null) {
+            message += '\n\nExisting Case: $existingCaseNo';
           }
-        } catch (_) {}
+        } else if (statusCode == 413) {
+          message = 'The report data is too large. Try taking fewer or smaller photos.';
+        } else if (statusCode == 500) {
+          message = 'Internal server error. Please try again later.';
+        }
+        
+        return {'success': false, 'message': message};
       }
+      
+      String networkMessage = 'Network error. Please check your connection.';
+      if (e.type == DioExceptionType.connectionTimeout) {
+        networkMessage = 'Connection timed out. Your connection might be too slow.';
+      } else if (e.type == DioExceptionType.receiveTimeout) {
+        networkMessage = 'Server is taking too long to respond. Please try again.';
+      } else if (e.type == DioExceptionType.cancel) {
+        networkMessage = 'Request was cancelled.';
+      }
+      
       return {
         'success': false,
-        'message': 'Network error. Please check your connection and try again.',
+        'message': networkMessage,
       };
     } catch (e) {
-      return {'success': false, 'message': 'An unexpected error occurred'};
+      return {'success': false, 'message': 'An unexpected error occurred: ${e.toString()}'};
     }
   }
 
   Future<void> addCurrentCordinate() async {
     try {
-      // Ensure permissions
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          print(" Location permissions are denied");
-          return;
-        }
+        if (permission == LocationPermission.denied) return;
       }
+      if (permission == LocationPermission.deniedForever) return;
 
-      if (permission == LocationPermission.deniedForever) {
-        print(" Location permissions are permanently denied");
-        return;
-      }
-
-      // Get current position
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
@@ -79,15 +89,19 @@ class HomeProvider extends ChangeNotifier {
       coordinates.add({
         "latitude": position.latitude,
         "longitude": position.longitude,
+        "accuracy": position.accuracy,
       });
 
       notifyListeners();
-      print(
-        "Added current location: ${position.latitude}, ${position.longitude}",
-      );
     } catch (e) {
-      print("Error getting device location: $e");
+      debugPrint("❌ [addCurrentCordinate] $e");
     }
+  }
+
+  /// Returns the GPS accuracy (in meters) of the most recent coordinate.
+  double? get lastAccuracy {
+    if (coordinates.isEmpty) return null;
+    return coordinates.last['accuracy'];
   }
 
   Future<void> addPotholeImage(File image) async {
@@ -95,16 +109,25 @@ class HomeProvider extends ChangeNotifier {
       potholeImages.add(image);
       notifyListeners();
     } catch (e) {
-      print("Error uploading pothole images: $e");
+      debugPrint("❌ [addPotholeImage] $e");
     }
+  }
+
+  HomeProvider() {
+    getUserDetails();
   }
 
   Future<void> getUserDetails() async {
     try {
       final data = await TokenHandler.getString("user");
-      userdetails = Profile.fromJson(jsonDecode(data));
+      if (data.isNotEmpty) {
+        userdetails = Profile.fromJson(jsonDecode(data));
+      } else {
+        userdetails = null;
+      }
     } catch (e) {
-      debugPrint(e.toString());
+      debugPrint("❌ [getUserDetails] $e");
+      userdetails = null;
     } finally {
       loading = false;
       notifyListeners();
@@ -119,16 +142,17 @@ class HomeProvider extends ChangeNotifier {
         "${DateTime.now().millisecondsSinceEpoch}_${path.basename(file.path)}",
       );
 
-      var result = await FlutterImageCompress.compressAndGetFile(
+      // Resize and compress: 1024px is plenty for potholes
+      return await FlutterImageCompress.compressAndGetFile(
         file.absolute.path,
         targetPath,
-        quality: 70, // reduce size (0–100)
+        quality: 70,
+        minWidth: 1024,
+        minHeight: 1024,
         format: CompressFormat.jpeg,
       );
-
-      return result;
     } catch (e) {
-      print("❌ Error compressing image: $e");
+      debugPrint("❌ [compressImage] $e");
       return null;
     }
   }

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:rudra/config/theme/app_pallet.dart';
 import 'package:rudra/screens/notifications/models/notifiction_model.dart';
 import 'package:rudra/screens/notifications/provider/notification_provider.dart';
 import 'package:provider/provider.dart';
 
 class Notifications extends StatefulWidget {
-  const Notifications({super.key});
+  final void Function(String filter)? onNavigateToReports;
+  const Notifications({super.key, this.onNavigateToReports});
 
   @override
   State<Notifications> createState() => _NotificationsState();
@@ -48,6 +50,83 @@ class _NotificationsState extends State<Notifications> {
             if (provider.loading) {
               return const Center(
                 child: CircularProgressIndicator(color: AppPallet.primaryColor),
+              );
+            }
+
+            // Error state — server returned an error
+            if (provider.errorMessage != null) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.cloud_off_rounded,
+                        size: 64,
+                        color: Colors.red.withOpacity(0.6),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        "Failed to load notifications",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppPallet.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.red.withOpacity(0.2),
+                          ),
+                        ),
+                        child: Text(
+                          provider.errorMessage!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.red[700],
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "This is a server-side issue.\nPlease try again later.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.withOpacity(0.7),
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          provider.fetchNotifications();
+                        },
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: const Text("Retry"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppPallet.primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               );
             }
 
@@ -150,9 +229,36 @@ class _NotificationsState extends State<Notifications> {
                           // Notifications for this date
                           ...dayNotifications
                               .map(
-                                (notification) => _buildNotificationCard(
-                                  context,
-                                  notification,
+                                (notification) => Dismissible(
+                                  key: Key(notification.id.toString()),
+                                  direction: DismissDirection.endToStart,
+                                  background: Container(
+                                    alignment: Alignment.centerRight,
+                                    padding: const EdgeInsets.only(right: 20),
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withOpacity(0.9),
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: const Icon(
+                                      Icons.delete_outline,
+                                      color: Colors.white,
+                                      size: 28,
+                                    ),
+                                  ),
+                                  onDismissed: (direction) async {
+                                    final success = await Provider.of<NotificationProvider>(context, listen: false).deleteNotification(notification.id!);
+                                    if (!success && context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Failed to delete notification')),
+                                      );
+                                      Provider.of<NotificationProvider>(context, listen: false).fetchNotifications();
+                                    }
+                                  },
+                                  child: _buildNotificationCard(
+                                    context,
+                                    notification,
+                                  ),
                                 ),
                               )
                               .toList(),
@@ -258,7 +364,23 @@ class _NotificationsState extends State<Notifications> {
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () {
-            // Handle tap
+            final status = notification.caseStatus?.toLowerCase().trim() ?? '';
+            // Map caseStatus to ReportProvider filter strings
+            String? filter;
+            if (status == 'in_progress' || status == 'in progress') {
+              filter = 'In progress';
+            } else if (status == 'completed' || status == 'complete') {
+              filter = 'Completed';
+            } else if (status == 'rejected' || status == 'reject') {
+              filter = 'Rejected';
+            } else if (status == 'submitted' || status == 'submit') {
+              filter = 'Submitted';
+            }
+            // Navigate to reports only for known statuses
+            if (filter != null) {
+              widget.onNavigateToReports?.call(filter);
+            }
+            // For others (null/unknown status) — do nothing, stay on notifications
           },
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -487,14 +609,14 @@ class FeedbackForm extends StatefulWidget {
 }
 
 class _FeedbackFormState extends State<FeedbackForm> {
-  int? selectedRating;
+  String? selectedRating;
   final TextEditingController _feedbackController = TextEditingController();
 
   final List<Map<String, dynamic>> ratings = [
-    {'label': 'Bad', 'emoji': '😞', 'value': 1},
-    {'label': 'Okay', 'emoji': '😐', 'value': 2},
-    {'label': 'Good', 'emoji': '😊', 'value': 3},
-    {'label': 'Amazing', 'emoji': '😁', 'value': 4},
+    {'label': 'Bad',     'emoji': '😞', 'value': 'Bad'},
+    {'label': 'Okay',    'emoji': '😐', 'value': 'Okay'},
+    {'label': 'Good',    'emoji': '😊', 'value': 'Good'},
+    {'label': 'Amazing', 'emoji': '😁', 'value': 'Amazing'},
   ];
 
   @override
@@ -504,34 +626,22 @@ class _FeedbackFormState extends State<FeedbackForm> {
   }
 
   void _submitFeedback() {
+    HapticFeedback.mediumImpact();
     if (selectedRating != null) {
-      // Here you would typically send the feedback to your backend
-      print('Rating: $selectedRating');
-      print('Feedback: ${_feedbackController.text}');
-      print('Case ID: ${widget.caseId}');
       Provider.of<NotificationProvider>(context, listen: false).submitFeedback(
         int.parse(widget.caseId.split('-').last),
-        ratings.firstWhere((r) => r['value'] == selectedRating)['label'],
+        selectedRating!,
         _feedbackController.text,
       );
-
-      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Thank you for your feedback!'),
           backgroundColor: Colors.green,
         ),
       );
-
-      // Call the callback if provided
-      if (widget.onSubmitted != null) {
-        widget.onSubmitted!();
-      }
-
-      // Close the dialog
+      widget.onSubmitted?.call();
       Navigator.of(context).pop();
     } else {
-      // Show error message if no rating selected
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select a rating'),
@@ -544,165 +654,265 @@ class _FeedbackFormState extends State<FeedbackForm> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
           color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 40,
+              offset: const Offset(0, 16),
+            ),
+          ],
         ),
-        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header with thumbs up icon
+            // ── Drag handle ──────────────────────────────────
             Container(
-              width: 60,
-              height: 60,
+              height: 4,
+              width: 40,
+              margin: const EdgeInsets.only(top: 12),
               decoration: BoxDecoration(
-                color: Colors.green,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.thumb_up, color: Colors.white, size: 32),
-            ),
-            const SizedBox(height: 20),
-
-            // Title
-            const Text(
-              'Rate the Repair',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
-            const SizedBox(height: 12),
 
-            // Subtitle
-            const Text(
-              'Let us know how well the repair was done. Your feedback helps improve road safety.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey, height: 1.4),
-            ),
-            const SizedBox(height: 30),
-
-            // Rating options
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children:
-                  ratings.map((rating) {
-                    bool isSelected = selectedRating == rating['value'];
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          selectedRating = rating['value'];
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 8,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ── Bouncing header icon ──────────────────────
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.4, end: 1.0),
+                    duration: const Duration(milliseconds: 600),
+                    curve: Curves.elasticOut,
+                    builder: (_, scale, child) =>
+                        Transform.scale(scale: scale, child: child),
+                    child: Container(
+                      width: 70,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF34C759), Color(0xFF248A3D)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                        decoration: BoxDecoration(
-                          color:
-                              isSelected ? Colors.green.withOpacity(0.1) : null,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color:
-                                isSelected ? Colors.green : Colors.transparent,
-                            width: 2,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF34C759).withOpacity(0.4),
+                            blurRadius: 18,
+                            offset: const Offset(0, 6),
                           ),
-                        ),
-                        child: Column(
-                          children: [
-                            Text(
-                              rating['emoji'],
-                              style: TextStyle(
-                                fontSize: 32,
-                                color: isSelected ? Colors.green : Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              rating['label'],
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: isSelected ? Colors.green : Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
+                        ],
                       ),
-                    );
-                  }).toList(),
-            ),
-            const SizedBox(height: 30),
-
-            // Optional feedback text
-            Align(
-              alignment: Alignment.centerLeft,
-              child: RichText(
-                text: const TextSpan(
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  children: [
-                    TextSpan(text: 'Tell us more '),
-                    TextSpan(
-                      text: '(Optional)',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontWeight: FontWeight.normal,
+                      child: const Center(
+                        child: Text('🛣️', style: TextStyle(fontSize: 30)),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── Title ─────────────────────────────────────
+                  const Text(
+                    'Rate the Repair',
+                    style: TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1C1C1E),
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'How well was the pothole fixed?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade500,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 26),
+
+                  // ── Animated emoji rating row ─────────────────
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: ratings.map((rating) {
+                      final isSelected = selectedRating == rating['value'];
+                      return _AnimatedEmojiOption(
+                        emoji: rating['emoji'],
+                        label: rating['label'],
+                        isSelected: isSelected,
+                        onTap: () =>
+                            setState(() => selectedRating = rating['value']),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 26),
+
+                  // ── Submit button — activates on selection ────
+                  GestureDetector(
+                    onTap: _submitFeedback,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      height: 52,
+                      decoration: BoxDecoration(
+                        gradient: selectedRating != null
+                            ? const LinearGradient(
+                                colors: [Color(0xFF34C759), Color(0xFF248A3D)],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                              )
+                            : LinearGradient(
+                                colors: [
+                                  Colors.grey.shade200,
+                                  Colors.grey.shade200,
+                                ],
+                              ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: selectedRating != null
+                            ? [
+                                BoxShadow(
+                                  color: const Color(0xFF34C759).withOpacity(0.4),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 5),
+                                ),
+                              ]
+                            : [],
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Submit Feedback',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: selectedRating != null
+                                ? Colors.white
+                                : Colors.grey.shade400,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // ── Cancel link ───────────────────────────────
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(
+                      'Maybe Later',
+                      style: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-            // Feedback text field
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: TextField(
-                controller: _feedbackController,
-                maxLines: 4,
-                decoration: InputDecoration(
-                  hintText: 'Share your experience...',
-                  hintStyle: TextStyle(color: Colors.grey.shade500),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.all(16),
-                ),
-              ),
+// ── Animated emoji rating option ─────────────────────────────────────────────
+class _AnimatedEmojiOption extends StatefulWidget {
+  final String emoji;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _AnimatedEmojiOption({
+    required this.emoji,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  State<_AnimatedEmojiOption> createState() => _AnimatedEmojiOptionState();
+}
+
+class _AnimatedEmojiOptionState extends State<_AnimatedEmojiOption>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 450),
+    );
+    _scale = Tween<double>(begin: 1.0, end: 1.35).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut),
+    );
+  }
+
+  @override
+  void didUpdateWidget(_AnimatedEmojiOption old) {
+    super.didUpdateWidget(old);
+    if (widget.isSelected && !old.isSelected) {
+      _ctrl.forward(from: 0);
+    } else if (!widget.isSelected && old.isSelected) {
+      _ctrl.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        widget.onTap();
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+        decoration: BoxDecoration(
+          color: widget.isSelected
+              ? const Color(0xFF34C759).withOpacity(0.1)
+              : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: widget.isSelected
+                ? const Color(0xFF34C759)
+                : Colors.grey.shade200,
+            width: widget.isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            ScaleTransition(
+              scale: _scale,
+              child: Text(widget.emoji, style: const TextStyle(fontSize: 34)),
             ),
-            const SizedBox(height: 30),
-
-            // Submit button
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _submitFeedback,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-                child: const Text(
-                  'Submit Feedback',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
+            const SizedBox(height: 6),
+            Text(
+              widget.label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: widget.isSelected
+                    ? const Color(0xFF34C759)
+                    : Colors.grey.shade500,
               ),
             ),
           ],

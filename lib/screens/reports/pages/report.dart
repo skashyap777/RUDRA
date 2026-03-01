@@ -1,4 +1,6 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:rudra/config/theme/app_pallet.dart';
 import 'package:rudra/screens/notifications/pages/notifications.dart';
 import 'package:rudra/screens/reports/models/report_model.dart';
@@ -99,9 +101,7 @@ class _ReportState extends State<Report> {
                 child:
                     provider.isLoading
                         ? const Center(
-                          child: CircularProgressIndicator(
-                            color: AppPallet.primaryColor,
-                          ),
+                          child: CircularProgressIndicator.adaptive(),
                         )
                         : provider.reports.isEmpty
                         ? Center(
@@ -152,7 +152,10 @@ class _ReportState extends State<Report> {
     ReportProvider provider,
   ) {
     return GestureDetector(
-      onTap: () => provider.updateFilter(label),
+      onTap: () {
+        HapticFeedback.selectionClick();
+        provider.updateFilter(label);
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -300,38 +303,10 @@ class _ReportState extends State<Report> {
                 ),
                 const SizedBox(height: 16),
 
-                // Footer: Severity and Actions
+                // Footer: Actions
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.warning_amber_rounded,
-                            size: 14,
-                            color: AppPallet.textSecondary,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            report.severity ?? 'Medium',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppPallet.textSecondary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
                     TextButton.icon(
                       onPressed: () => _showImageViewer(context, report),
                       icon: const Icon(Icons.image_outlined, size: 18),
@@ -349,15 +324,14 @@ class _ReportState extends State<Report> {
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       onPressed: () {
+                        HapticFeedback.lightImpact();
                         showDialog(
                           context: context,
                           barrierDismissible: false,
                           builder: (BuildContext context) {
                             return FeedbackForm(
                               caseId: "${report.caseNo}",
-                              onSubmitted: () {
-                                print('Feedback submitted successfully');
-                              },
+                              onSubmitted: () {},
                             );
                           },
                         );
@@ -407,12 +381,16 @@ class _ReportState extends State<Report> {
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'submitted':
+      case 'submit':
         return const Color(0xFF2196F3);
       case 'in_progress':
+      case 'in progress':
         return const Color(0xFFFF9800);
       case 'completed':
+      case 'complete':
         return const Color(0xFF4CAF50);
       case 'rejected':
+      case 'reject':
         return const Color(0xFFF44336);
       default:
         return Colors.grey;
@@ -422,12 +400,16 @@ class _ReportState extends State<Report> {
   String _formatStatus(String status) {
     switch (status.toLowerCase()) {
       case 'in_progress':
+      case 'in progress':
         return 'In Progress';
       case 'submitted':
+      case 'submit':
         return 'Submitted';
       case 'completed':
+      case 'complete':
         return 'Completed';
       case 'rejected':
+      case 'reject':
         return 'Rejected';
       default:
         return status;

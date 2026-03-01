@@ -17,11 +17,14 @@ class LoginWithMobileScreen extends StatelessWidget {
       builder: (context, store, child) {
         return Scaffold(
           backgroundColor: Colors.white,
-          body: SafeArea(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: SingleChildScrollView(
-                child: Column(
+          body: GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            behavior: HitTestBehavior.opaque,
+            child: SafeArea(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: SingleChildScrollView(
+                  child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Image.asset(Assets.loginone, height: 180),
@@ -84,6 +87,7 @@ class LoginWithMobileScreen extends StatelessWidget {
                       height: 48,
                       child: ElevatedButton(
                         onPressed: () async {
+                          HapticFeedback.mediumImpact();
                           final phone = _phoneController.text.trim();
 
                           // Validation
@@ -123,6 +127,7 @@ class LoginWithMobileScreen extends StatelessWidget {
               ),
             ),
           ),
+        ),
         );
       },
     );

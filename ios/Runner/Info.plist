@@ -64,6 +64,12 @@
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>This app needs notification permissions to send you updates about pothole reports.</string>
 
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
+
 	<!-- Google Maps API Key -->
 	<key>GMSServices</key>
 	<string>AIzaSyBU8zniWDcPMAUWkqIJ0iTmGbkF7jtRwzA</string>

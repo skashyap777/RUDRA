@@ -19,80 +19,65 @@ class AuthProvider extends ChangeNotifier {
   LocationModel? locationData;
 
   bool loading = false;
+
   Future<bool> generateOtp(String mobileNumebr) async {
     try {
       final response = await apiService.post(
         url: "/auth/signup-login",
         data: {"mobile": mobileNumebr, "user_type": "citizen"},
       );
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return true;
-      }
-      return false;
+      return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
       return false;
-    } finally {}
+    }
   }
 
   Future<bool> verifyOtp(String mobileNumebr, String otp) async {
     try {
-      debugPrint("Verifying OTP for mobile: $mobileNumebr, OTP: $otp");
       final response = await apiService.post(
         url: "/auth/verify-otp",
         data: {"mobile": mobileNumebr, "otp": otp},
       );
-      debugPrint("OTP Verify Response Status: ${response.statusCode}");
-      debugPrint("OTP Verify Response Data: ${response.data}");
       if (response.statusCode == 200 || response.statusCode == 201) {
         otpverify = OTPVerifyModel.fromJson(response.data);
         await TokenHandler.setString("token", otpverify?.data?.token ?? "");
-        debugPrint(
-          "OTP verification successful, token saved: ${otpverify?.data?.token}",
-        );
+        await TokenHandler.setString("refresh_token", otpverify?.data?.refreshToken ?? "");
         return true;
       }
-      debugPrint("OTP verification failed with status: ${response.statusCode}");
       return false;
     } catch (e) {
-      debugPrint("OTP verification error: $e");
+      debugPrint("❌ [verifyOtp] $e");
       return false;
-    } finally {}
+    }
+  }
+
+  Future<bool> resendOtp(String mobileNumebr) async {
+    try {
+      final response = await apiService.post(
+        url: "/auth/resend-otp",
+        data: {"mobile": mobileNumebr},
+      );
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      debugPrint("❌ [resendOtp] $e");
+      return false;
+    }
   }
 
   Future<bool> checkLocation(double latitude, double longitude) async {
     loading = true;
     notifyListeners();
     try {
-      debugPrint(
-        "Checking location boundary for coordinates: $latitude, $longitude",
-      );
       final response = await apiService.get(
-        url:
-            "/admin/check-location-in-boundary?latitude=$latitude&longitude=$longitude",
+        url: "/admin/check-location-in-boundary?latitude=$latitude&longitude=$longitude",
       );
-      debugPrint("Location Check Response Status: ${response.statusCode}");
-      debugPrint("Location Check Response Data: ${response.data}");
       if (response.statusCode == 200 || response.statusCode == 201) {
         checkLocationData = CheckLocationModel.fromJson(response.data);
-        debugPrint(
-          "Location boundary check response parsed: within_boundary = ${checkLocationData?.data?.withinBoundary}",
-        );
-
-        // Check if location is actually within boundary
-        if (checkLocationData?.data?.withinBoundary == true) {
-          debugPrint("Location is within boundary - verification successful");
-          return true;
-        } else {
-          debugPrint("Location is NOT within boundary - verification failed");
-          return false;
-        }
+        return checkLocationData?.data?.withinBoundary == true;
       }
-      debugPrint(
-        "Location boundary check failed with status: ${response.statusCode}",
-      );
       return false;
     } catch (e) {
-      debugPrint("Location boundary check error: $e");
+      debugPrint("❌ [checkLocation] $e");
       return false;
     } finally {
       loading = false;
@@ -102,53 +87,35 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> getProfileData() async {
     try {
-      debugPrint("Fetching profile data");
       final response = await apiService.get(url: "/profile");
-      debugPrint("Profile Response Status: ${response.statusCode}");
-      debugPrint("Profile Response Data: ${response.data}");
       if (response.statusCode == 200 || response.statusCode == 201) {
         profile = UserDetailsModel.fromJson(response.data);
-        await TokenHandler.setString(
-          "user",
-          jsonEncode(profile?.data?.profile),
-        );
+        await TokenHandler.setString("user", jsonEncode(profile?.data?.profile));
         userData = Profile.fromJson(response.data);
-        debugPrint("Profile data fetched successfully");
         return true;
       }
-      debugPrint("Profile fetch failed with status: ${response.statusCode}");
       return false;
     } catch (e) {
-      debugPrint("Profile fetch error: $e");
+      debugPrint("❌ [getProfileData] $e");
       return false;
-    } finally {}
+    }
   }
 
   Future<bool> createProfile(FormData data) async {
     try {
-      debugPrint("Creating profile with form data");
       final response = await apiService.postMultipart(
         url: "/profile/create",
         formData: data,
       );
-      debugPrint("Create Profile Response Status: ${response.statusCode}");
-      debugPrint("Create Profile Response Data: ${response.data}");
-
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final profile = response.data['data']['profile'];
-        await TokenHandler.setString("user", jsonEncode(profile));
+        final profileData = response.data['data']['profile'];
+        await TokenHandler.setString("user", jsonEncode(profileData));
         userData = Profile.fromJson(response.data);
-        debugPrint("Profile created successfully");
         return true;
-      } else {
-        debugPrint(
-          "Profile creation failed with status: ${response.statusCode}",
-        );
-        debugPrint("Error response: ${response.data}");
-        return false;
       }
+      return false;
     } catch (e) {
-      debugPrint("Profile creation error: $e");
+      debugPrint("❌ [createProfile] $e");
       return false;
     }
   }
@@ -156,34 +123,20 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> checkLocationWithpin(int pincode) async {
     loading = true;
     notifyListeners();
-    String apiKey = "AIzaSyBU8zniWDcPMAUWkqIJ0iTmGbkF7jtRwzA";
-
+    const apiKey = "AIzaSyBU8zniWDcPMAUWkqIJ0iTmGbkF7jtRwzA";
     try {
-      debugPrint("Checking location with pincode: $pincode");
       final response = await apiService.get(
-        url:
-            "https://maps.googleapis.com/maps/api/geocode/json?address=$pincode&key=$apiKey",
+        url: "https://maps.googleapis.com/maps/api/geocode/json?address=$pincode&key=$apiKey",
       );
-      debugPrint("Geocode Response Status: ${response.statusCode}");
-      debugPrint("Geocode Response Data: ${response.data}");
       if (response.statusCode == 200 || response.statusCode == 201) {
         locationData = LocationModel.fromJson(response.data);
         final lat = locationData?.results?[0].geometry?.location?.lat ?? 0.0;
         final lng = locationData?.results?[0].geometry?.location?.lng ?? 0.0;
-        debugPrint("Geocoded coordinates: $lat, $lng");
-        final res = await checkLocation(lat, lng);
-        if (res) {
-          debugPrint("Location verification successful with pincode");
-          return true;
-        } else {
-          debugPrint("Location verification failed with pincode");
-          return false;
-        }
+        return await checkLocation(lat, lng);
       }
-      debugPrint("Geocode API failed with status: ${response.statusCode}");
       return false;
     } catch (e) {
-      debugPrint("Pincode location check error: $e");
+      debugPrint("❌ [checkLocationWithpin] $e");
       return false;
     } finally {
       loading = false;

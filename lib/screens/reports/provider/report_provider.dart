@@ -41,12 +41,28 @@ class ReportProvider extends ChangeNotifier {
 
   List<Data> get filteredReports {
     if (selectedFilter == 'All') return reports;
-    return reports
-        .where(
-          (report) =>
-              report.status?.toLowerCase() ==
-              selectedFilter.toLowerCase().replaceAll(' ', '_'),
-        )
-        .toList();
+    
+    // Normalize selectedFilter to match server status (Submitted, In progress, Completed, Rejected)
+    String searchStatus = selectedFilter.toLowerCase().trim();
+    if (searchStatus == 'in progress') searchStatus = 'in_progress';
+    
+    return reports.where((report) {
+      final reportStatus = report.status?.toLowerCase().trim() ?? '';
+      
+      if (searchStatus == 'in_progress') {
+        return reportStatus == 'in_progress' || reportStatus == 'in progress';
+      }
+      if (searchStatus == 'completed') {
+        return reportStatus == 'completed' || reportStatus == 'complete';
+      }
+      if (searchStatus == 'rejected') {
+        return reportStatus == 'rejected' || reportStatus == 'reject';
+      }
+      if (searchStatus == 'submitted') {
+        return reportStatus == 'submitted' || reportStatus == 'submit';
+      }
+      
+      return reportStatus == searchStatus;
+    }).toList();
   }
 }

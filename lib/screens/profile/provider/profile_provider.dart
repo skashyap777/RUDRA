@@ -1,8 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
+import 'package:http/http.dart' as http;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:rudra/config/constants/api_constants.dart';
 import 'package:rudra/config/network/dio.dart';
 import 'package:rudra/config/utils/local_storage.dart';
 import 'package:rudra/screens/profile/models/profile_model.dart';
@@ -10,6 +15,25 @@ import 'package:rudra/screens/profile/models/profile_model.dart';
 class ProfileProvider extends ChangeNotifier {
   final apiService = HTTP();
   ProfileModel? profile;
+
+  ProfileProvider() {
+    _init();
+  }
+
+  Future<void> _init() async {
+    try {
+      final data = await TokenHandler.getString("user");
+      if (data.isNotEmpty) {
+        profile = ProfileModel(
+          status: "success",
+          data: Data(profile: Profile.fromJson(jsonDecode(data))),
+        );
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint("❌ [ProfileProvider._init] $e");
+    }
+  }
 
   Future<bool> getProfileData() async {
     try {
@@ -31,87 +55,152 @@ class ProfileProvider extends ChangeNotifier {
   }
 
   Future<bool> updateProfilePhoto(File file) async {
-    debugPrint("📸 [iOS DEBUG] Starting profile photo upload...");
-    debugPrint("📸 [iOS DEBUG] Platform: ${Platform.operatingSystem}");
-    debugPrint("📸 [iOS DEBUG] Platform.isIOS: ${Platform.isIOS}");
-    debugPrint("📁 [iOS DEBUG] File path: ${file.path}");
-    
     try {
-      // Check if file exists
-      bool exists = await file.exists();
-      debugPrint("📁 [iOS DEBUG] File exists: $exists");
-      
-      if (!exists) {
-        debugPrint("❌ [iOS DEBUG] File does not exist!");
+      if (!await file.exists()) {
+        debugPrint("❌ [updateProfilePhoto] File does not exist: ${file.path}");
+        return false;
+      }
+
+      // Compress profile photo before upload
+      final compressedXFile = await _compressImage(file);
+      if (compressedXFile == null) {
+        debugPrint("❌ [updateProfilePhoto] Compression failed");
         return false;
       }
       
-      int fileSize = await file.length();
-      debugPrint("📁 [iOS DEBUG] File size: $fileSize bytes");
+      final compressedFile = File(compressedXFile.path);
+      // Use path.basename for robust platform-agnostic filename extraction
+      String filename = path.basename(compressedFile.path);
       
-      String filename = file.path.split("/").last;
-      debugPrint("📝 [iOS DEBUG] Filename: $filename");
-      
-      final fileExtension = file.path.split('.').last.toLowerCase();
-      debugPrint("📝 [iOS DEBUG] File extension: $fileExtension");
-      
-      final contentType = fileExtension == 'png'
-          ? 'image/png'
-          : fileExtension == 'jpg' || fileExtension == 'jpeg'
-              ? 'image/jpeg'
-              : 'image/jpeg'; // fallback
-      
-      debugPrint("📝 [iOS DEBUG] Content type: $contentType");
-      
-      // Read file bytes to verify
-      final fileBytes = await file.readAsBytes();
-      debugPrint("📁 [iOS DEBUG] File bytes read successfully: ${fileBytes.length} bytes");
-      
+      // Ensure no URL encoding issues in filename
+      if (filename.contains('%')) {
+        try {
+          filename = Uri.decodeComponent(filename);
+        } catch (_) {}
+      }
+
       FormData formData = FormData.fromMap({
         "profile_photo": await MultipartFile.fromFile(
-          file.path,
+          compressedFile.path,
           filename: filename,
-          contentType: DioMediaType.parse(contentType),
+          contentType: DioMediaType("image", "jpeg"),
         ),
       });
-      
-      debugPrint("📦 [iOS DEBUG] FormData created successfully");
-      debugPrint("📦 [iOS DEBUG] FormData fields: ${formData.fields}");
-      debugPrint("📦 [iOS DEBUG] FormData files: ${formData.files.length}");
-      
-      debugPrint("🚀 [iOS DEBUG] Sending PATCH request to /profile/update-photo");
-      
+
+      debugPrint("🚀 [updateProfilePhoto] Uploading $filename...");
       final response = await apiService.patchMultipart(
         url: "/profile/update-photo",
         formData: formData,
       );
-      
-      debugPrint("✅ [iOS DEBUG] Response received");
-      debugPrint("✅ [iOS DEBUG] Response status: ${response.statusCode}");
-      debugPrint("✅ [iOS DEBUG] Response headers: ${response.headers}");
-      debugPrint("✅ [iOS DEBUG] Response data: ${response.data}");
-      
+
       if (response.statusCode == 200 || response.statusCode == 201) {
-        debugPrint("✅ [iOS DEBUG] Profile photo upload successful, refreshing profile data...");
+        debugPrint("✅ [updateProfilePhoto] Successfully updated");
         await getProfileData();
         return true;
       }
-      debugPrint("❌ [iOS DEBUG] Unexpected status: ${response.statusCode}");
+      debugPrint("⚠️ [updateProfilePhoto] Unexpected status: ${response.statusCode}");
       return false;
     } on DioException catch (e) {
-      debugPrint("❌ [iOS DEBUG] DioException occurred");
-      debugPrint("❌ [iOS DEBUG] DioException type: ${e.type}");
-      debugPrint("❌ [iOS DEBUG] DioException message: ${e.message}");
-      debugPrint("❌ [iOS DEBUG] DioException response status: ${e.response?.statusCode}");
-      debugPrint("❌ [iOS DEBUG] DioException response headers: ${e.response?.headers}");
-      debugPrint("❌ [iOS DEBUG] DioException response data: ${e.response?.data}");
-      debugPrint("❌ [iOS DEBUG] DioException request path: ${e.requestOptions.path}");
-      debugPrint("❌ [iOS DEBUG] DioException request headers: ${e.requestOptions.headers}");
-      debugPrint("❌ [iOS DEBUG] Stack trace: ${e.stackTrace}");
+      final errorMsg = e.response?.data?['message'] ?? e.message;
+      debugPrint("❌ [updateProfilePhoto] DioError: ${e.response?.statusCode} - $errorMsg");
       return false;
     } catch (e) {
-      debugPrint("❌ [iOS DEBUG] General error: $e");
-      debugPrint("❌ [iOS DEBUG] Stack trace: ${StackTrace.current}");
+      debugPrint("❌ [updateProfilePhoto] Generic Error: $e");
+      return false;
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  Future<XFile?> _compressImage(File file) async {
+    try {
+      final dir = await getTemporaryDirectory();
+      final targetPath = path.join(
+        dir.path,
+        "${DateTime.now().millisecondsSinceEpoch}_profile.jpg",
+      );
+
+      return await FlutterImageCompress.compressAndGetFile(
+        file.absolute.path,
+        targetPath,
+        quality: 70,
+        minWidth: 512, // Profile pics don't need to be huge
+        minHeight: 512,
+        format: CompressFormat.jpeg,
+      );
+    } catch (e) {
+      debugPrint("❌ [_compressImage] $e");
+      return null;
+    }
+  }
+
+  /// Updates ONLY the address by re-calling POST /profile/create.
+  /// Since profile_photo is required by that endpoint, we re-download
+  /// the user's existing photo and re-upload it so it stays unchanged.
+  Future<bool> updateAddress(String newAddress, {String? newName}) async {
+    try {
+      debugPrint("🚀 [updateAddress] Invoked with newAddress: '$newAddress', newName: '$newName'");
+      final currentProfile = profile?.data?.profile;
+      if (currentProfile == null) {
+        debugPrint("❌ [updateAddress] Error: currentProfile is null!");
+        return false;
+      }
+
+      final nameToUse = newName ?? currentProfile.name ?? "";
+      final photoLink = currentProfile.profilePhotoLink;
+      if (photoLink == null || photoLink.isEmpty || photoLink == "null") {
+        debugPrint("❌ [updateAddress] Error: photoLink is null or empty. photoLink: '$photoLink'");
+        return false;
+      }
+
+      // Download the existing profile photo to a temp file
+      final photoUrl = photoLink.startsWith('/') 
+          ? "${ApiConstants.imageBaseUrl}$photoLink" 
+          : "${ApiConstants.imageBaseUrl}/$photoLink";
+          
+      debugPrint("🚀 [updateAddress] Downloading photo from URL: $photoUrl");
+      final httpResponse = await http.get(Uri.parse(Uri.encodeFull(photoUrl)));
+      if (httpResponse.statusCode != 200) {
+        debugPrint("❌ [updateAddress] Failed to download photo. statusCode: ${httpResponse.statusCode}");
+        return false;
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File('${tempDir.path}/temp_profile_photo.jpg');
+      await tempFile.writeAsBytes(httpResponse.bodyBytes);
+      debugPrint("✅ [updateAddress] Photo successfully downloaded to temp file: ${tempFile.path}");
+
+      // Call POST /profile/create with same photo + new address
+      debugPrint("🚀 [updateAddress] Calling POST /profile/create with name: '$nameToUse', com_address: '$newAddress'");
+      final formData = FormData.fromMap({
+        "name": nameToUse,
+        "com_address": newAddress,
+        "profile_photo": await MultipartFile.fromFile(
+          tempFile.path,
+          filename: "profile_photo.jpg",
+          contentType: DioMediaType("image", "jpeg"),
+        ),
+      });
+
+      final response = await apiService.postMultipart(
+        url: "/profile/create",
+        formData: formData,
+      );
+
+      debugPrint("✅ [updateAddress] Response status: ${response.statusCode}, body: ${response.data}");
+
+      if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
+        debugPrint("✅ [updateAddress] Address updated successfully.");
+        await getProfileData();
+        return true;
+      }
+      debugPrint("⚠️ [updateAddress] Unexpected status code: ${response.statusCode}");
+      return false;
+    } on DioException catch (e) {
+      debugPrint("❌ [updateAddress] DioException! status code: ${e.response?.statusCode}, data: ${e.response?.data}, message: ${e.message}");
+      return false;
+    } catch (e) {
+      debugPrint("❌ [updateAddress] Generic Exception: $e");
       return false;
     } finally {
       notifyListeners();
@@ -119,47 +208,28 @@ class ProfileProvider extends ChangeNotifier {
   }
 
   Future<bool> updateProfile({required String name, required String address}) async {
-    debugPrint("👤 [iOS DEBUG] Starting profile update...");
-    debugPrint("👤 [iOS DEBUG] Platform: ${Platform.operatingSystem}");
-    debugPrint("👤 [iOS DEBUG] Name: $name");
-    debugPrint("👤 [iOS DEBUG] Address: $address");
-    
     try {
-      final requestData = {
-        "name": name,
-        "address": address,
-      };
-      debugPrint("📦 [iOS DEBUG] Request data: $requestData");
-      
+      debugPrint("🚀 [updateProfile] Invoked with name: '$name', address: '$address'");
+      debugPrint("🚀 [updateProfile] Calling PATCH /profile/update-name with name: '$name'");
       final response = await apiService.patch(
         url: "/profile/update-name",
-        data: requestData,
+        data: {"name": name},
       );
-      
-      debugPrint("✅ [iOS DEBUG] Profile update response received");
-      debugPrint("✅ [iOS DEBUG] Response status: ${response.statusCode}");
-      debugPrint("✅ [iOS DEBUG] Response headers: ${response.headers}");
-      debugPrint("✅ [iOS DEBUG] Response data: ${response.data}");
-      
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        debugPrint("✅ [iOS DEBUG] Profile update successful, refreshing profile data...");
-        // Refresh profile data after successful update
+
+      debugPrint("✅ [updateProfile] Response status: ${response.statusCode}, body: ${response.data}");
+
+      if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
+        debugPrint("✅ [updateProfile] Name updated successfully.");
         await getProfileData();
         return true;
       }
-      debugPrint("❌ [iOS DEBUG] Unexpected status code: ${response.statusCode}");
+      debugPrint("⚠️ [updateProfile] Unexpected status code: ${response.statusCode}");
       return false;
     } on DioException catch (e) {
-      debugPrint("❌ [iOS DEBUG] DioException in profile update");
-      debugPrint("❌ [iOS DEBUG] DioException type: ${e.type}");
-      debugPrint("❌ [iOS DEBUG] DioException message: ${e.message}");
-      debugPrint("❌ [iOS DEBUG] DioException response status: ${e.response?.statusCode}");
-      debugPrint("❌ [iOS DEBUG] DioException response data: ${e.response?.data}");
-      debugPrint("❌ [iOS DEBUG] Stack trace: ${e.stackTrace}");
+      debugPrint("❌ [updateProfile] DioException! status code: ${e.response?.statusCode}, data: ${e.response?.data}, message: ${e.message}");
       return false;
     } catch (e) {
-      debugPrint("❌ [iOS DEBUG] General error in profile update: $e");
-      debugPrint("❌ [iOS DEBUG] Stack trace: ${StackTrace.current}");
+      debugPrint("❌ [updateProfile] Generic Exception: $e");
       return false;
     } finally {
       notifyListeners();

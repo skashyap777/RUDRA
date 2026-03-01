@@ -1,9 +1,10 @@
 import 'dart:io';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rudra/config/theme/app_pallet.dart';
 import 'package:rudra/config/utils/app_functions.dart';
-import 'package:rudra/screens/home/pages/dashboard.dart';
 import 'package:rudra/screens/home/provider/home_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -114,13 +115,25 @@ class PotholeDetectedScreen extends StatelessWidget {
                           side: BorderSide(color: AppPallet.buttonColor),
                         ),
                         onPressed: () async {
-                          final res =
-                              await AppFunctions.captureImageFromCamera();
-                          if (res != null) {
-                            context.pushReplacement('/scanpothole', extra: res);
-                          }
+                          HapticFeedback.mediumImpact();
+                          // Show iOS-style loading
+                          showCupertinoDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (context) => const Center(
+                              child: CupertinoActivityIndicator(radius: 16),
+                            ),
+                          );
                           homeProvider.addPotholeImage(file);
-                          homeProvider.addCurrentCordinate();
+                          await homeProvider.addCurrentCordinate();
+                          
+                          if (context.mounted) {
+                            Navigator.pop(context); // close dialog
+                            final res = await AppFunctions.captureImageFromCamera();
+                            if (res != null) {
+                              context.pushReplacement('/scanpothole', extra: res);
+                            }
+                          }
                         },
                         child: const Text(
                           "Add More Images",
@@ -133,10 +146,23 @@ class PotholeDetectedScreen extends StatelessWidget {
                           minimumSize: const Size(double.infinity, 48),
                           backgroundColor: AppPallet.buttonColor,
                         ),
-                        onPressed: () {
+                        onPressed: () async {
+                          HapticFeedback.mediumImpact();
+                          // Show iOS-style loading
+                          showCupertinoDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (context) => const Center(
+                              child: CupertinoActivityIndicator(radius: 16),
+                            ),
+                          );
                           homeProvider.addPotholeImage(file);
-                          homeProvider.addCurrentCordinate();
-                          context.push('/addPothole');
+                          await homeProvider.addCurrentCordinate();
+                          
+                          if (context.mounted) {
+                            Navigator.pop(context); // close dialog
+                            context.push('/addPothole');
+                          }
                         },
                         child: const Text("Continue"),
                       ),
