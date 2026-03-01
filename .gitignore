@@ -47,3 +47,6 @@ app.*.map.json
 # Build logs and debug files
 logs
 *.log.txt
+
+# Orchids workspace files
+.orchids/
