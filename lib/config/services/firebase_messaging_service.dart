@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -29,9 +30,13 @@ class FirebaseMessagingService {
           "token": fcmToken,
           "fcm_token": fcmToken, // Sending both in case backend expects one or the other
           "device_type": Platform.isIOS ? "ios" : "android",
+          "device_info": Platform.isIOS ? "iOS Device" : "Android Device",
         },
       );
       debugPrint("✅ FCM Token seamlessly synced with backend server.");
+    } on DioException catch (e) {
+      debugPrint("❌ Failed to sync FCM token with server [DioException]: ${e.response?.statusCode}");
+      debugPrint("❌ Backend Response Body: ${e.response?.data}");
     } catch (e) {
       debugPrint("❌ Failed to sync FCM token with server: $e");
     }

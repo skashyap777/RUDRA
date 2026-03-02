@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -98,7 +99,7 @@ class _DashboardState extends State<Dashboard> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(30),
-                        child: store.userdetails?.profilePhotoLink != null
+                        child: store.userdetails?.profilePhotoLink != null && store.userdetails?.profilePhotoLink != 'null'
                             ? Image.network(
                                 "${ApiConstants.imageBaseUrl}${store.userdetails!.profilePhotoLink}",
                                 width: 50,
@@ -502,7 +503,7 @@ class PotholeDetector {
   String _lastError = '';
 
   final int inputSize = 640;
-  final double confidenceThreshold = 0.80;
+  final double confidenceThreshold = 0.75;
 
   String get lastError => _lastError;
   bool get isLoaded => _isLoaded;
@@ -591,32 +592,66 @@ class PotholeDetector {
         }),
       );
 
-      // Output buffer [1, 5, 8400]
-      final output = List.generate(
-        1,
-        (_) => List.generate(5, (_) => List.filled(8400, 0.0)),
-      );
+      // Get dynamic shapes
+      final outputTensor = _interpreter!.getOutputTensor(0);
+      final outputShape = outputTensor.shape; // e.g. [1, 5, 8400] or [1, 8400, 5]
+      
+      // Calculate total elements needed for safety
+      int totalOutputElements = 1;
+      for (int i = 0; i < outputShape.length; i++) {
+        totalOutputElements *= outputShape[i];
+      }
 
-      _interpreter!.run(input, output);
+      // Output buffer mapped to flat list to bypass iOS memory pointer mismatches
+      var outputBuffer = Float32List(totalOutputElements);
+      var outputList = outputBuffer.reshape(outputShape);
 
-      // Parse YOLOv8 output
-      final results = output[0]; // [5, 8400]
+      _interpreter!.run(input, outputList);
+
       double maxConf = 0.0;
-      String? topLabel;
+      int highConfCount = 0;
+      String? topLabel = _labels.isNotEmpty ? _labels[0] : 'Pothole';
 
-      for (int i = 0; i < 8400; i++) {
-        final conf = results[4][i];
-        if (conf < confidenceThreshold) continue;
-        if (conf > maxConf) {
-          maxConf = conf;
-          topLabel = _labels.isNotEmpty ? _labels[0] : 'Pothole';
+      // Ensure dynamic parsing regardless of shape (1x5x8400 vs 1x8400x5)
+      if (outputShape.length == 3 && outputShape[1] == 5 && outputShape[2] == 8400) {
+        // Shape is [1, 5, 8400] -> Dimension 1 is class+bbox, Dimension 2 is boxes
+        final results = outputList[0] as List;
+        for (int i = 0; i < 8400; i++) {
+          final conf = results[4][i] as double;
+          // Filter out impossible values due to memory anomalies on iOS
+          if (conf > 1.0) continue; 
+          
+          if (conf > confidenceThreshold) {
+            highConfCount++;
+          }
+          if (conf > maxConf) {
+            maxConf = conf;
+          }
         }
+      } else if (outputShape.length == 3 && outputShape[1] == 8400 && outputShape[2] == 5) {
+        // Shape is [1, 8400, 5] -> Dimension 1 is boxes, Dimension 2 is class+bbox
+        final results = outputList[0] as List;
+        for (int i = 0; i < 8400; i++) {
+          final box = results[i] as List;
+          final conf = box[4] as double;
+          // Filter out impossible values due to memory anomalies on iOS
+          if (conf > 1.0) continue; 
+          
+          if (conf > confidenceThreshold) {
+            highConfCount++;
+          }
+          if (conf > maxConf) {
+            maxConf = conf;
+          }
+        }
+      } else {
+        return 'Error: Unrecognized model output shape $outputShape';
       }
 
       final pct = (maxConf * 100).toStringAsFixed(1);
       
-      // Extremely strict check for indoor objects acting as false positives
-      if (topLabel != null && maxConf >= confidenceThreshold) {
+      // Implementing user-requested detection loop formula
+      if (maxConf > 0.5 || highConfCount > 0) {
         return '$topLabel detected ($pct%)';
       } else {
         return 'no pothole detected';

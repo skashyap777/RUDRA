@@ -188,14 +188,14 @@ class _EditProfileState extends State<EditProfile> {
                               backgroundColor: Colors.grey[300],
                               backgroundImage: _profileImage != null
                                   ? FileImage(_profileImage!)
-                                  : (profileProvider.profile?.data?.profile?.profilePhotoLink != null
+                                  : (profileProvider.profile?.data?.profile?.profilePhotoLink != null && profileProvider.profile?.data?.profile?.profilePhotoLink != 'null'
                                           ? NetworkImage(
                                               "${ApiConstants.imageBaseUrl}${profileProvider.profile?.data?.profile?.profilePhotoLink}",
                                             )
                                           : null)
                                       as ImageProvider?,
                               child: _profileImage == null &&
-                                      profileProvider.profile?.data?.profile?.profilePhotoLink == null
+                                      (profileProvider.profile?.data?.profile?.profilePhotoLink == null || profileProvider.profile?.data?.profile?.profilePhotoLink == 'null')
                                   ? const Icon(
                                       Icons.person,
                                       size: 40,

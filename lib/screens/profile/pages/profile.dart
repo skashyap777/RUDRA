@@ -77,20 +77,27 @@ class _ProfileState extends State<Profile> {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(40),
-                          child: Image.network(
-                            "${ApiConstants.imageBaseUrl}${profile?.profilePhotoLink}",
-                            fit: BoxFit.cover,
-                            width: 70,
-                            height: 70,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Image.asset(
+                          child: profile?.profilePhotoLink != null && profile?.profilePhotoLink != 'null'
+                            ? Image.network(
+                                "${ApiConstants.imageBaseUrl}${profile?.profilePhotoLink}",
+                                fit: BoxFit.cover,
+                                width: 70,
+                                height: 70,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Image.asset(
+                                    Assets.profile,
+                                    fit: BoxFit.cover,
+                                    width: 70,
+                                    height: 70,
+                                  );
+                                },
+                              )
+                            : Image.asset(
                                 Assets.profile,
                                 fit: BoxFit.cover,
                                 width: 70,
                                 height: 70,
-                              );
-                            },
-                          ),
+                              ),
                         ),
                       ),
                       const SizedBox(width: 20),
