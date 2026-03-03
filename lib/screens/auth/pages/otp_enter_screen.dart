@@ -5,6 +5,7 @@ import 'package:rudra/config/theme/app_pallet.dart';
 import 'package:rudra/config/utils/assets.dart';
 import 'package:rudra/screens/auth/provider/auth_provide.dart';
 import 'package:rudra/screens/home/provider/home_provider.dart';
+import 'package:rudra/config/services/firebase_messaging_service.dart';
 import 'package:provider/provider.dart';
 
 class OtpEnterScreen extends StatefulWidget {
@@ -96,7 +97,10 @@ class _OtpEnterScreenState extends State<OtpEnterScreen> {
                         if (context.mounted) {
                           Provider.of<HomeProvider>(context, listen: false).getUserDetails();
                         }
-                        if (store.profile!.data!.profile!.name != null &&
+                        // Sync FCM token now that we are logged in
+                        FirebaseMessagingService().initNotifications();
+
+                        if (store.profile?.data?.profile?.name != null &&
                             store.profile!.data!.profile!.name!.isNotEmpty) {
                           context.push("/home");
                         } else {
