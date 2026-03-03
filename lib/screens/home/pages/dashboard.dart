@@ -581,76 +581,63 @@ class PotholeDetector {
       final oriented = img.bakeOrientation(raw);
       final resized = img.copyResize(oriented, width: inputSize, height: inputSize);
 
-      // Build input tensor [1, 640, 640, 3]
-      final input = List.generate(
-        1,
-        (_) => List.generate(inputSize, (y) {
-          return List.generate(inputSize, (x) {
-            final p = resized.getPixel(x, y);
-            return [p.r / 255.0, p.g / 255.0, p.b / 255.0];
-          });
-        }),
-      );
-
-      // Get dynamic shapes
-      final outputTensor = _interpreter!.getOutputTensor(0);
-      final outputShape = outputTensor.shape; // e.g. [1, 5, 8400] or [1, 8400, 5]
-      
-      // Calculate total elements needed for safety
-      int totalOutputElements = 1;
-      for (int i = 0; i < outputShape.length; i++) {
-        totalOutputElements *= outputShape[i];
+      // 5. Input Buffer: Using a flat Float32List is MUCH safer for iOS memory alignment
+      final inputBuffer = Float32List(1 * inputSize * inputSize * 3);
+      int inputIdx = 0;
+      for (int y = 0; y < inputSize; y++) {
+        for (int x = 0; x < inputSize; x++) {
+          final p = resized.getPixel(x, y);
+          inputBuffer[inputIdx++] = p.r / 255.0;
+          inputBuffer[inputIdx++] = p.g / 255.0;
+          inputBuffer[inputIdx++] = p.b / 255.0;
+        }
       }
 
-      // Output buffer mapped to flat list to bypass iOS memory pointer mismatches
-      var outputBuffer = Float32List(totalOutputElements);
-      var outputList = outputBuffer.reshape(outputShape);
+      // 6. Get Output Tensors & Allocate Contiguous Memory
+      final outputTensor = _interpreter!.getOutputTensor(0);
+      final outputShape = outputTensor.shape; 
+      
+      int totalOutputElements = 1;
+      for (var dim in outputShape) totalOutputElements *= dim;
 
-      _interpreter!.run(input, outputList);
+      final outputBuffer = Float32List(totalOutputElements);
+
+      // 7. Run Inference using flat buffers
+      _interpreter!.run(inputBuffer.buffer.asUint8List(), outputBuffer.buffer.asUint8List());
 
       double maxConf = 0.0;
       int highConfCount = 0;
-      String? topLabel = _labels.isNotEmpty ? _labels[0] : 'Pothole';
+      String topLabel = _labels.isNotEmpty ? _labels[0] : 'Pothole';
 
-      // Ensure dynamic parsing regardless of shape (1x5x8400 vs 1x8400x5)
-      if (outputShape.length == 3 && outputShape[1] == 5 && outputShape[2] == 8400) {
-        // Shape is [1, 5, 8400] -> Dimension 1 is class+bbox, Dimension 2 is boxes
-        final results = outputList[0] as List;
+      // 8. Robust Parsing (Manual Indexing to bypass iOS shape scrambling)
+      // Shape is [1, 5, 8400] or [1, 8400, 5]
+      if (outputShape[1] == 5 && outputShape[2] == 8400) {
+        // [1, 5, 8400] -> index 4 is confidence for all 8400 boxes
+        // Confidence plane starts at index 4 * 8400
+        int confStart = 4 * 8400;
         for (int i = 0; i < 8400; i++) {
-          final conf = results[4][i] as double;
-          // Filter out impossible values due to memory anomalies on iOS
-          if (conf > 1.0) continue; 
+          final conf = outputBuffer[confStart + i];
+          if (conf > 1.1 || conf < 0) continue; // Safety trap for memory garbage
           
-          if (conf > confidenceThreshold) {
-            highConfCount++;
-          }
-          if (conf > maxConf) {
-            maxConf = conf;
-          }
+          if (conf > maxConf) maxConf = conf;
+          if (conf > confidenceThreshold) highConfCount++;
         }
-      } else if (outputShape.length == 3 && outputShape[1] == 8400 && outputShape[2] == 5) {
-        // Shape is [1, 8400, 5] -> Dimension 1 is boxes, Dimension 2 is class+bbox
-        final results = outputList[0] as List;
+      } else if (outputShape[1] == 8400 && outputShape[2] == 5) {
+        // [1, 8400, 5] -> index 4 of EVERY box (5 elements each)
         for (int i = 0; i < 8400; i++) {
-          final box = results[i] as List;
-          final conf = box[4] as double;
-          // Filter out impossible values due to memory anomalies on iOS
-          if (conf > 1.0) continue; 
-          
-          if (conf > confidenceThreshold) {
-            highConfCount++;
-          }
-          if (conf > maxConf) {
-            maxConf = conf;
-          }
+          final conf = outputBuffer[i * 5 + 4];
+          if (conf > 1.1 || conf < 0) continue; // Safety trap for memory garbage
+
+          if (conf > maxConf) maxConf = conf;
+          if (conf > confidenceThreshold) highConfCount++;
         }
       } else {
-        return 'Error: Unrecognized model output shape $outputShape';
+        return 'Error: Unrecognized output shape $outputShape';
       }
 
       final pct = (maxConf * 100).toStringAsFixed(1);
       
-      // Implementing user-requested detection loop formula
+      // 9. Final Detection Decision
       if (maxConf > 0.5 || highConfCount > 0) {
         return '$topLabel detected ($pct%)';
       } else {
