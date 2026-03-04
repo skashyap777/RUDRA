@@ -573,77 +573,78 @@ class PotholeDetector {
     }
 
     try {
+      // 1. Load & decode image
       final bytes = await imageFile.readAsBytes();
       final raw = img.decodeImage(bytes);
       if (raw == null) return 'Invalid image';
 
-      // Bake orientation so portrait photos map correctly
+      // 2. Bake EXIF orientation so portrait photos are correct
       final oriented = img.bakeOrientation(raw);
-      final resized = img.copyResize(oriented, width: inputSize, height: inputSize);
 
-      // 5. Input Buffer: Using a flat Float32List is MUCH safer for iOS memory alignment
+      // 3. Crop to square (center crop) — YOLO models expect square input
+      final int w = oriented.width;
+      final int h = oriented.height;
+      final int cropSize = w < h ? w : h;
+      final int xOffset = ((w - cropSize) / 2).round();
+      final int yOffset = ((h - cropSize) / 2).round();
+      final cropped = img.copyCrop(
+        oriented,
+        x: xOffset,
+        y: yOffset,
+        width: cropSize,
+        height: cropSize,
+      );
+
+      // 4. Resize to 640x640
+      final resized = img.copyResize(cropped, width: inputSize, height: inputSize);
+
+      // 5. Normalize pixels to [0, 1] into a flat Float32List
       final inputBuffer = Float32List(1 * inputSize * inputSize * 3);
-      int inputIdx = 0;
+      int pixelIndex = 0;
       for (int y = 0; y < inputSize; y++) {
         for (int x = 0; x < inputSize; x++) {
           final p = resized.getPixel(x, y);
-          inputBuffer[inputIdx++] = p.r / 255.0;
-          inputBuffer[inputIdx++] = p.g / 255.0;
-          inputBuffer[inputIdx++] = p.b / 255.0;
+          inputBuffer[pixelIndex++] = p.r / 255.0;
+          inputBuffer[pixelIndex++] = p.g / 255.0;
+          inputBuffer[pixelIndex++] = p.b / 255.0;
         }
       }
 
-      // 6. Get Output Tensors & Allocate Contiguous Memory
-      final outputTensor = _interpreter!.getOutputTensor(0);
-      final outputShape = outputTensor.shape; 
-      
-      int totalOutputElements = 1;
-      for (var dim in outputShape) totalOutputElements *= dim;
+      // 6. Reshape input to [1, 640, 640, 3]
+      final inputTensor = inputBuffer.reshape([1, inputSize, inputSize, 3]);
 
-      final outputBuffer = Float32List(totalOutputElements);
+      // 7. Prepare output buffer — hardcoded [1, 5, 8400] for YOLO model
+      // This is explicit and avoids ALL shape-detection bugs on iOS
+      final output = List.generate(
+        1, (_) => List.generate(5, (_) => List.filled(8400, 0.0))
+      );
 
-      // 7. Run Inference using flat buffers
-      _interpreter!.run(inputBuffer.buffer.asUint8List(), outputBuffer.buffer.asUint8List());
+      // 8. Run inference
+      _interpreter!.run(inputTensor, output);
 
-      double maxConf = 0.0;
+      // 9. Parse YOLO output: output[0][4][i] = confidence of box i
+      double maxConfidence = 0.0;
       int highConfCount = 0;
-      String topLabel = _labels.isNotEmpty ? _labels[0] : 'Pothole';
 
-      // 8. Robust Parsing (Manual Indexing to bypass iOS shape scrambling)
-      // Shape is [1, 5, 8400] or [1, 8400, 5]
-      if (outputShape[1] == 5 && outputShape[2] == 8400) {
-        // [1, 5, 8400] -> index 4 is confidence for all 8400 boxes
-        // Confidence plane starts at index 4 * 8400
-        int confStart = 4 * 8400;
-        for (int i = 0; i < 8400; i++) {
-          final conf = outputBuffer[confStart + i];
-          if (conf > 1.1 || conf < 0) continue; // Safety trap for memory garbage
-          
-          if (conf > maxConf) maxConf = conf;
-          if (conf > confidenceThreshold) highConfCount++;
-        }
-      } else if (outputShape[1] == 8400 && outputShape[2] == 5) {
-        // [1, 8400, 5] -> index 4 of EVERY box (5 elements each)
-        for (int i = 0; i < 8400; i++) {
-          final conf = outputBuffer[i * 5 + 4];
-          if (conf > 1.1 || conf < 0) continue; // Safety trap for memory garbage
-
-          if (conf > maxConf) maxConf = conf;
-          if (conf > confidenceThreshold) highConfCount++;
-        }
-      } else {
-        return 'Error: Unrecognized output shape $outputShape';
+      for (int i = 0; i < 8400; i++) {
+        final double conf = output[0][4][i];
+        if (conf > maxConfidence) maxConfidence = conf;
+        if (conf > confidenceThreshold) highConfCount++;
       }
 
-      final pct = (maxConf * 100).toStringAsFixed(1);
-      
-      // 9. Final Detection Decision
-      if (maxConf > 0.5 || highConfCount > 0) {
+      final String topLabel = _labels.isNotEmpty ? _labels[0] : 'Pothole';
+      final String pct = (maxConfidence * 100).toStringAsFixed(1);
+
+      debugPrint('🔍 Max confidence: $pct% | High conf detections: $highConfCount');
+
+      // 10. Detection decision
+      if (maxConfidence > 0.5 || highConfCount > 0) {
         return '$topLabel detected ($pct%)';
       } else {
         return 'no pothole detected';
       }
     } catch (e) {
+      debugPrint('❌ Prediction error: $e');
       return 'Error: $e';
     }
   }
