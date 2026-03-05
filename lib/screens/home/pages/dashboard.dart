@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:rudra/config/theme/app_pallet.dart';
 import 'package:rudra/config/constants/api_constants.dart';
 import 'package:rudra/config/utils/app_functions.dart';
@@ -258,6 +259,72 @@ class _DashboardState extends State<Dashboard> {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 12),
+
+                      // ── [TEMP TEST ONLY] Gallery Picker ─────────────────
+                      // TODO: Remove this button before final production release
+                      GestureDetector(
+                        onTap: () async {
+                          final picker = ImagePicker();
+                          final picked = await picker.pickImage(
+                            source: ImageSource.gallery,
+                            imageQuality: 90,
+                          );
+                          if (picked != null && context.mounted) {
+                            store.clearReportData();
+                            context.push('/scanpothole', extra: File(picked.path));
+                          }
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A1A2E),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: Colors.orangeAccent.withOpacity(0.6),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.photo_library_outlined,
+                                color: Colors.orangeAccent,
+                                size: 22,
+                              ),
+                              const SizedBox(width: 10),
+                              const Text(
+                                '🧪 Pick from Gallery',
+                                style: TextStyle(
+                                  color: Colors.orangeAccent,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'TEST',
+                                  style: TextStyle(
+                                    color: Colors.orange,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // ── [END TEMP TEST] ─────────────────────────────────
 
                       const SizedBox(height: 32),
 
@@ -613,29 +680,71 @@ class PotholeDetector {
       // 6. Reshape input to [1, 640, 640, 3]
       final inputTensor = inputBuffer.reshape([1, inputSize, inputSize, 3]);
 
-      // 7. Prepare output buffer — hardcoded [1, 5, 8400] for YOLO model
-      // This is explicit and avoids ALL shape-detection bugs on iOS
-      final output = List.generate(
-        1, (_) => List.generate(5, (_) => List.filled(8400, 0.0))
-      );
+      // ── DIAGNOSTIC: Log actual tensor shapes from the interpreter ──
+      final inputTensorInfo = _interpreter!.getInputTensor(0);
+      final outputTensorInfo = _interpreter!.getOutputTensor(0);
+      debugPrint('📐 INPUT tensor shape: ${inputTensorInfo.shape}, type: ${inputTensorInfo.type}');
+      debugPrint('📐 OUTPUT tensor shape: ${outputTensorInfo.shape}, type: ${outputTensorInfo.type}');
+
+      final outputShape = outputTensorInfo.shape;
+      final int dim1 = outputShape.length >= 2 ? outputShape[1] : 0;
+      final int dim2 = outputShape.length >= 3 ? outputShape[2] : 0;
+
+      // 7. Dynamically create output buffer based on ACTUAL model shape
+      late List<List<List<double>>> output;
+      bool isTransposed = false; // [1, 8400, 5] = transposed
+
+      if (dim1 == 5 && dim2 == 8400) {
+        // Standard YOLO: [1, 5, 8400]
+        output = List.generate(1, (_) => List.generate(5, (_) => List.filled(8400, 0.0)));
+        isTransposed = false;
+      } else if (dim1 == 8400 && dim2 == 5) {
+        // Transposed: [1, 8400, 5]
+        output = List.generate(1, (_) => List.generate(8400, (_) => List.filled(5, 0.0)));
+        isTransposed = true;
+      } else {
+        // Unknown shape — try standard [1, 5, 8400] as fallback
+        debugPrint('⚠️ Unexpected output shape: $outputShape, trying [1, 5, 8400]');
+        output = List.generate(1, (_) => List.generate(5, (_) => List.filled(8400, 0.0)));
+        isTransposed = false;
+      }
 
       // 8. Run inference
       _interpreter!.run(inputTensor, output);
 
-      // 9. Parse YOLO output: output[0][4][i] = confidence of box i
+      // ── DIAGNOSTIC: Dump sample raw output values ──
+      if (!isTransposed) {
+        debugPrint('📊 Sample output[0][0][0..4] (bbox x): ${output[0][0].sublist(0, 5)}');
+        debugPrint('📊 Sample output[0][4][0..4] (conf):    ${output[0][4].sublist(0, 5)}');
+      } else {
+        debugPrint('📊 Sample output[0][0][0..4] (box0):    ${output[0][0]}');
+        debugPrint('📊 Sample output[0][1][0..4] (box1):    ${output[0][1]}');
+      }
+
+      // 9. Parse YOLO output based on detected shape
       double maxConfidence = 0.0;
       int highConfCount = 0;
 
-      for (int i = 0; i < 8400; i++) {
-        final double conf = output[0][4][i];
-        if (conf > maxConfidence) maxConfidence = conf;
-        if (conf > confidenceThreshold) highConfCount++;
+      if (!isTransposed) {
+        // [1, 5, 8400]: confidence = output[0][4][i]
+        for (int i = 0; i < 8400; i++) {
+          final double conf = output[0][4][i];
+          if (conf > maxConfidence) maxConfidence = conf;
+          if (conf > confidenceThreshold) highConfCount++;
+        }
+      } else {
+        // [1, 8400, 5]: confidence = output[0][i][4]
+        for (int i = 0; i < 8400; i++) {
+          final double conf = output[0][i][4];
+          if (conf > maxConfidence) maxConfidence = conf;
+          if (conf > confidenceThreshold) highConfCount++;
+        }
       }
 
       final String topLabel = _labels.isNotEmpty ? _labels[0] : 'Pothole';
       final String pct = (maxConfidence * 100).toStringAsFixed(1);
 
-      debugPrint('🔍 Max confidence: $pct% | High conf detections: $highConfCount');
+      debugPrint('🔍 Shape: ${isTransposed ? "[1,8400,5]" : "[1,5,8400]"} | Max conf: $pct% | High conf: $highConfCount | Threshold: ${(confidenceThreshold * 100).toStringAsFixed(0)}%');
 
       // 10. Detection decision
       if (maxConfidence > 0.5 || highConfCount > 0) {

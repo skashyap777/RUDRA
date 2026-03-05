@@ -14,23 +14,32 @@ import 'package:provider/provider.dart';
 import 'package:sizer/sizer.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  
-  // Initialize Push Notifications
-  await FirebaseMessagingService().initNotifications();
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    
+    // Core Firebase Initialization
+    await Firebase.initializeApp();
+    
+    // Initialize Push Notifications in the background (Non-blocking)
+    // This prevents the "White Screen" if the app hangs waiting for permissions or tokens
+    FirebaseMessagingService().initNotifications();
 
-  // iOS-style status bar (light icons on dark AppBar)
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarBrightness: Brightness.light,
-      statusBarIconBrightness: Brightness.dark,
-      systemNavigationBarColor: Colors.white,
-      systemNavigationBarIconBrightness: Brightness.dark,
-    ),
-  );
+    // iOS-style status bar (light icons on dark AppBar)
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarBrightness: Brightness.light,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+    );
 
-  runApp(const MyApp());
+    runApp(const MyApp());
+  } catch (e) {
+    debugPrint("❌ Initialization Error: $e");
+    // Even if initialization fails, we must run the app to avoid white screen
+    runApp(const MyApp());
+  }
 }
 
 class MyApp extends StatelessWidget {
