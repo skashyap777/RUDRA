@@ -6,7 +6,7 @@ publish_to: 'none'
 
 # Version: <major>.<minor>.<patch>+<build>
 # Increment the build number for every App Store upload
-version: 1.0.0+48
+version: 1.0.0+51
 
 environment:
   sdk: ^3.7.2

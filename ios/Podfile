@@ -48,6 +48,16 @@ post_install do |installer|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
       config.build_settings['STRIP_STYLE'] = 'non-global'
+      config.build_settings['ENABLE_BITCODE'] = 'NO'
+    end
+  end
+  
+  # Disable Bitcode for Runner target
+  installer.generated_projects.each do |project|
+    project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['ENABLE_BITCODE'] = 'NO'
+      end
     end
   end
 end
