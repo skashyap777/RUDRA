@@ -324,7 +324,8 @@ class _AddPotholeState extends State<AddPothole> {
                         _buildInfoSection(
                           'Area of the Pothole*',
                           _areaController,
-                          hintText: 'Enter Area',
+                          hintText: 'Auto-filled from GPS location',
+                          readOnly: true,
                         ),
                         _buildInfoSection(
                           'Landmark*',
@@ -433,13 +434,27 @@ class _AddPotholeState extends State<AddPothole> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey[700],
-            ),
+          Row(
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey[700],
+                ),
+              ),
+              if (readOnly) ...
+                [
+                  const SizedBox(width: 6),
+                  Icon(Icons.lock_outline, size: 13, color: Colors.grey[400]),
+                  const SizedBox(width: 3),
+                  Text(
+                    'Auto-filled',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[400], fontStyle: FontStyle.italic),
+                  ),
+                ],
+            ],
           ),
           const SizedBox(height: 4),
           TextFormField(
@@ -447,6 +462,11 @@ class _AddPotholeState extends State<AddPothole> {
             readOnly: readOnly,
             decoration: InputDecoration(
               hintText: hintText ?? "Enter $label",
+              filled: readOnly,
+              fillColor: readOnly ? Colors.grey[100] : null,
+              suffixIcon: readOnly
+                  ? Icon(Icons.gps_fixed, size: 16, color: Colors.grey[400])
+                  : null,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 12,
                 vertical: 12,
@@ -457,10 +477,19 @@ class _AddPotholeState extends State<AddPothole> {
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: Colors.grey[300]!),
+                borderSide: BorderSide(
+                  color: readOnly ? Colors.grey[200]! : Colors.grey[300]!,
+                ),
+              ),
+              disabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[200]!),
               ),
             ),
-            style: const TextStyle(fontSize: 14, color: Colors.black87),
+            style: TextStyle(
+              fontSize: 14,
+              color: readOnly ? Colors.grey[600] : Colors.black87,
+            ),
           ),
         ],
       ),
