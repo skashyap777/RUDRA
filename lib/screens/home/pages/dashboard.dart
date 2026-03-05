@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:rudra/config/theme/app_pallet.dart';
 import 'package:rudra/config/constants/api_constants.dart';
 import 'package:rudra/config/utils/app_functions.dart';
@@ -259,72 +258,6 @@ class _DashboardState extends State<Dashboard> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
-
-                      // ── [TEMP TEST ONLY] Gallery Picker ─────────────────
-                      // TODO: Remove this button before final production release
-                      GestureDetector(
-                        onTap: () async {
-                          final picker = ImagePicker();
-                          final picked = await picker.pickImage(
-                            source: ImageSource.gallery,
-                            imageQuality: 90,
-                          );
-                          if (picked != null && context.mounted) {
-                            store.clearReportData();
-                            context.push('/scanpothole', extra: File(picked.path));
-                          }
-                        },
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1A1A2E),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Colors.orangeAccent.withOpacity(0.6),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.photo_library_outlined,
-                                color: Colors.orangeAccent,
-                                size: 22,
-                              ),
-                              const SizedBox(width: 10),
-                              const Text(
-                                '🧪 Pick from Gallery',
-                                style: TextStyle(
-                                  color: Colors.orangeAccent,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text(
-                                  'TEST',
-                                  style: TextStyle(
-                                    color: Colors.orange,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      // ── [END TEMP TEST] ─────────────────────────────────
 
                       const SizedBox(height: 32),
 
