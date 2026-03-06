@@ -51,6 +51,7 @@ class PotholeDetectedScreen extends StatelessWidget {
               ),
               if (homeProvider.potholeImages.length > 1)
                 SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

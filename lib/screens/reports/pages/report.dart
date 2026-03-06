@@ -5,6 +5,7 @@ import 'package:rudra/config/theme/app_pallet.dart';
 import 'package:rudra/screens/notifications/pages/notifications.dart';
 import 'package:rudra/screens/reports/models/report_model.dart';
 import 'package:rudra/screens/reports/provider/report_provider.dart';
+import 'package:rudra/screens/reports/pages/track_report_bottom_sheet.dart';
 import 'package:provider/provider.dart';
 
 class Report extends StatefulWidget {
@@ -15,12 +16,21 @@ class Report extends StatefulWidget {
 }
 
 class _ReportState extends State<Report> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<ReportProvider>(context, listen: false).fetchReports();
     });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -42,8 +52,64 @@ class _ReportState extends State<Report> {
       ),
       body: Consumer<ReportProvider>(
         builder: (context, provider, child) {
+          // 1. All reports matching the search query (to calculate filter counts)
+          final matchedReports = provider.reports.where((report) {
+            if (_searchQuery.isEmpty) return true;
+            return report.caseNo?.toString().toLowerCase().contains(_searchQuery.toLowerCase()) ?? false;
+          }).toList();
+
+          // 2. The actually displayed reports (filtered by BOTH search AND selected chip)
+          final displayedReports = provider.filteredReports.where((report) {
+            if (_searchQuery.isEmpty) return true;
+            return report.caseNo?.toString().toLowerCase().contains(_searchQuery.toLowerCase()) ?? false;
+          }).toList();
+
+          // 3. Dynamic counts depending on search state
+          int allCount = provider.reportCounts?.all ?? 0;
+          int submittedCount = provider.reportCounts?.submitted ?? 0;
+          int inProgressCount = provider.reportCounts?.inProgress ?? 0;
+          int completedCount = provider.reportCounts?.completed ?? 0;
+          int rejectedCount = provider.reportCounts?.rejected ?? 0;
+
+          if (_searchQuery.isNotEmpty) {
+            allCount = matchedReports.length;
+            submittedCount = matchedReports.where((r) => r.status?.toLowerCase() == 'submitted' || r.status?.toLowerCase() == 'submit').length;
+            inProgressCount = matchedReports.where((r) => r.status?.toLowerCase() == 'in_progress' || r.status?.toLowerCase() == 'in progress').length;
+            completedCount = matchedReports.where((r) => r.status?.toLowerCase() == 'completed' || r.status?.toLowerCase() == 'complete').length;
+            rejectedCount = matchedReports.where((r) => r.status?.toLowerCase() == 'rejected' || r.status?.toLowerCase() == 'reject').length;
+          }
+
           return Column(
             children: [
+              // Search bar
+              Padding(
+                padding: const EdgeInsets.only(left: 16, right: 16, top: 16),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search by Report ID',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppPallet.primaryColor),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                ),
+              ),
               // Filter chips
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -55,7 +121,7 @@ class _ReportState extends State<Report> {
                       _buildFilterChip(
                         context,
                         'All',
-                        provider.reportCounts?.all ?? 0,
+                        allCount,
                         provider.selectedFilter == 'All',
                         provider,
                       ),
@@ -63,7 +129,7 @@ class _ReportState extends State<Report> {
                       _buildFilterChip(
                         context,
                         'Submitted',
-                        provider.reportCounts?.submitted ?? 0,
+                        submittedCount,
                         provider.selectedFilter == 'Submitted',
                         provider,
                       ),
@@ -71,7 +137,7 @@ class _ReportState extends State<Report> {
                       _buildFilterChip(
                         context,
                         'In progress',
-                        provider.reportCounts?.inProgress ?? 0,
+                        inProgressCount,
                         provider.selectedFilter == 'In progress',
                         provider,
                       ),
@@ -79,7 +145,7 @@ class _ReportState extends State<Report> {
                       _buildFilterChip(
                         context,
                         'Completed',
-                        provider.reportCounts?.completed ?? 0,
+                        completedCount,
                         provider.selectedFilter == 'Completed',
                         provider,
                       ),
@@ -87,7 +153,7 @@ class _ReportState extends State<Report> {
                       _buildFilterChip(
                         context,
                         'Rejected',
-                        provider.reportCounts?.rejected ?? 0,
+                        rejectedCount,
                         provider.selectedFilter == 'Rejected',
                         provider,
                       ),
@@ -103,7 +169,7 @@ class _ReportState extends State<Report> {
                         ? const Center(
                           child: CircularProgressIndicator.adaptive(),
                         )
-                        : provider.reports.isEmpty
+                        : displayedReports.isEmpty
                         ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -129,9 +195,9 @@ class _ReportState extends State<Report> {
                           onRefresh: () => provider.fetchReports(),
                           child: ListView.builder(
                             padding: const EdgeInsets.all(16),
-                            itemCount: provider.filteredReports.length,
+                            itemCount: displayedReports.length,
                             itemBuilder: (context, index) {
-                              final report = provider.filteredReports[index];
+                              final report = displayedReports[index];
                               return _buildReportCard(context, report);
                             },
                           ),
@@ -305,8 +371,33 @@ class _ReportState extends State<Report> {
 
                 // Footer: Actions
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (context) => Padding(
+                            padding: EdgeInsets.only(
+                              bottom: MediaQuery.of(context).viewInsets.bottom,
+                              top: MediaQuery.of(context).size.height * 0.2,
+                            ),
+                            child: TrackReportBottomSheet(
+                              caseId: report.id ?? 0,
+                              caseNo: report.caseNo ?? '',
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.timeline_outlined, size: 18),
+                      label: const Text("Track Report"),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppPallet.primaryColor,
+                      ),
+                    ),
                     TextButton.icon(
                       onPressed: () => _showImageViewer(context, report),
                       icon: const Icon(Icons.image_outlined, size: 18),
@@ -318,7 +409,7 @@ class _ReportState extends State<Report> {
                   ],
                 ),
                 if (report.feedBackProvided == false &&
-                    report.status != 'Rejected') ...[
+                    (report.status?.toLowerCase() == 'completed' || report.status?.toLowerCase() == 'complete')) ...[
                   const Divider(height: 24),
                   SizedBox(
                     width: double.infinity,

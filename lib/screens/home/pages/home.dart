@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:upgrader/upgrader.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:rudra/config/theme/app_pallet.dart';
@@ -80,7 +81,9 @@ class _HomeState extends State<Home> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return UpgradeAlert(
+      upgrader: Upgrader(),
+      child: Scaffold(
       body: PageView(
         physics: NeverScrollableScrollPhysics(),
         controller: pageController,
@@ -138,6 +141,6 @@ class _HomeState extends State<Home> {
           });
         },
       ),
-    );
+    ));
   }
 }

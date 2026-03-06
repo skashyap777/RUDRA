@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:rudra/config/theme/app_pallet.dart';
 import 'package:rudra/screens/home/provider/home_provider.dart';
+import 'package:rudra/screens/reports/provider/report_provider.dart';
 import 'package:provider/provider.dart';
 
 // class PotholeScanner extends StatefulWidget {
@@ -210,25 +211,28 @@ class _AddPotholeState extends State<AddPothole> {
                           ),
                         SizedBox(height: 20),
                         if (provider.potholeImages.length > 1)
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              ...provider.potholeImages.map((image) {
-                                return GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      index = provider.potholeImages.indexOf(
-                                        image,
-                                      );
-                                    });
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(right: 12),
-                                    child: _buildThumbnail(image),
-                                  ),
-                                );
-                              }),
-                            ],
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                ...provider.potholeImages.map((image) {
+                                  return GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        index = provider.potholeImages.indexOf(
+                                          image,
+                                        );
+                                      });
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(right: 12),
+                                      child: _buildThumbnail(image),
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
                           ),
                         SizedBox(height: 30),
 
@@ -507,6 +511,60 @@ class _AddPotholeState extends State<AddPothole> {
 
     try {
       final provider = Provider.of<HomeProvider>(context, listen: false);
+
+      // --- Client-side 5-meter radius check ---
+      final reportProvider = Provider.of<ReportProvider>(context, listen: false);
+      double? lat;
+      double? lng;
+      
+      if (provider.coordinates.isNotEmpty) {
+        lat = provider.coordinates.last['latitude'] as double?;
+        lng = provider.coordinates.last['longitude'] as double?;
+      } else if (_currentPosition != null) {
+        lat = _currentPosition!.latitude;
+        lng = _currentPosition!.longitude;
+      }
+
+      if (lat != null && lng != null) {
+        bool isDuplicate = false;
+        for (var report in reportProvider.reports) {
+          if (report.status?.toLowerCase() == 'rejected') continue; // Don't block if the previous one was rejected
+          
+          if (report.images != null) {
+            for (var image in report.images!) {
+              if (image.latitude != null && image.longitude != null) {
+                double distance = Geolocator.distanceBetween(
+                  lat,
+                  lng,
+                  image.latitude!,
+                  image.longitude!,
+                );
+                if (distance <= 5.0) {
+                  isDuplicate = true;
+                  break;
+                }
+              }
+            }
+          }
+          if (isDuplicate) break;
+        }
+
+        if (isDuplicate) {
+          if (mounted) {
+             setState(() {
+               _isSubmitting = false;
+             });
+          }
+          _showReportDialog(
+            context,
+            false,
+            "A pothole has already been reported by you within 5 meters of this location.",
+          );
+          return; // Stop submission
+        }
+      }
+      // ----------------------------------------
+
       List<MultipartFile> potholeImages = [];
       for (var i = 0; i < provider.potholeImages.length; i++) {
         // Compress image before uploading to reduce file size and upload time

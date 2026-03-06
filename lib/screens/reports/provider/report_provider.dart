@@ -14,13 +14,25 @@ class ReportProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await apiService.get(url: '/pothole/my-reports');
-      if (response.statusCode == 200) {
-        final reportModel = ReportModel.fromJson(response.data);
+      // Fetch both reports and the status counts concurrently
+      final responses = await Future.wait([
+        apiService.get(url: '/pothole/my-reports'),
+        apiService.get(url: '/pothole/status-counts'),
+      ]);
+
+      final reportResponse = responses[0];
+      final countResponse = responses[1];
+
+      if (reportResponse.statusCode == 200) {
+        final reportModel = ReportModel.fromJson(reportResponse.data);
         reports = reportModel.data ?? [];
-        reportCounts = reportModel.counts;
-        notifyListeners();
       }
+
+      if (countResponse.statusCode == 200 && countResponse.data['status'] == 'success') {
+        reportCounts = Counts.fromJson(countResponse.data['data']);
+      }
+      
+      notifyListeners();
     } catch (e) {
       print('Error fetching reports: $e');
     } finally {

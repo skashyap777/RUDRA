@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rudra/config/theme/app_pallet.dart';
@@ -575,40 +575,13 @@ class PotholeDetector {
     try {
       // 1. Load & decode image
       final bytes = await imageFile.readAsBytes();
-      final raw = img.decodeImage(bytes);
-      if (raw == null) return 'Invalid image';
+      // 1. Run heavy image processing in an isolate to prevent UI stutter/freezes
+      final inputBuffer = await compute(_preprocessImage, {
+        'bytes': bytes,
+        'inputSize': inputSize,
+      });
 
-      // 2. Bake EXIF orientation so portrait photos are correct
-      final oriented = img.bakeOrientation(raw);
-
-      // 3. Crop to square (center crop) — YOLO models expect square input
-      final int w = oriented.width;
-      final int h = oriented.height;
-      final int cropSize = w < h ? w : h;
-      final int xOffset = ((w - cropSize) / 2).round();
-      final int yOffset = ((h - cropSize) / 2).round();
-      final cropped = img.copyCrop(
-        oriented,
-        x: xOffset,
-        y: yOffset,
-        width: cropSize,
-        height: cropSize,
-      );
-
-      // 4. Resize to 640x640
-      final resized = img.copyResize(cropped, width: inputSize, height: inputSize);
-
-      // 5. Normalize pixels to [0, 1] into a flat Float32List
-      final inputBuffer = Float32List(1 * inputSize * inputSize * 3);
-      int pixelIndex = 0;
-      for (int y = 0; y < inputSize; y++) {
-        for (int x = 0; x < inputSize; x++) {
-          final p = resized.getPixel(x, y);
-          inputBuffer[pixelIndex++] = p.r / 255.0;
-          inputBuffer[pixelIndex++] = p.g / 255.0;
-          inputBuffer[pixelIndex++] = p.b / 255.0;
-        }
-      }
+      if (inputBuffer == null) return 'Invalid image format or processing failed';
 
       // 6. Reshape input to [1, 640, 640, 3]
       final inputTensor = inputBuffer.reshape([1, inputSize, inputSize, 3]);
@@ -680,7 +653,7 @@ class PotholeDetector {
       debugPrint('🔍 Shape: ${isTransposed ? "[1,8400,5]" : "[1,5,8400]"} | Max conf: $pct% | High conf: $highConfCount | Threshold: ${(confidenceThreshold * 100).toStringAsFixed(0)}%');
 
       // 10. Detection decision
-      if (maxConfidence > 0.5 || highConfCount > 0) {
+      if (maxConfidence >= confidenceThreshold || highConfCount > 0) {
         return '$topLabel detected ($pct%)';
       } else {
         return 'no pothole detected';
@@ -696,5 +669,54 @@ class PotholeDetector {
     _interpreter?.close();
     _interpreter = null;
     _isLoaded = false;
+  }
+}
+
+/// Runs in a background isolate to prevent UI frame drops 
+/// while applying heavyweight image manipulation and interpolation.
+Float32List? _preprocessImage(Map<String, dynamic> params) {
+  try {
+    final bytes = params['bytes'] as Uint8List;
+    final int inputSize = params['inputSize'] as int;
+
+    // 1. Load & decode image
+    final raw = img.decodeImage(bytes);
+    if (raw == null) return null;
+
+    // 2. Bake EXIF orientation so portrait photos are correct
+    final oriented = img.bakeOrientation(raw);
+
+    // 3. Crop to square (center crop) — YOLO models expect square input
+    final int w = oriented.width;
+    final int h = oriented.height;
+    final int cropSize = w < h ? w : h;
+    final int xOffset = ((w - cropSize) / 2).round();
+    final int yOffset = ((h - cropSize) / 2).round();
+    final cropped = img.copyCrop(
+      oriented,
+      x: xOffset,
+      y: yOffset,
+      width: cropSize,
+      height: cropSize,
+    );
+
+    // 4. Resize to 640x640
+    final resized = img.copyResize(cropped, width: inputSize, height: inputSize);
+
+    // 5. Normalize pixels to [0, 1] into a flat Float32List
+    final inputBuffer = Float32List(1 * inputSize * inputSize * 3);
+    int pixelIndex = 0;
+    for (int y = 0; y < inputSize; y++) {
+      for (int x = 0; x < inputSize; x++) {
+        final p = resized.getPixel(x, y);
+        inputBuffer[pixelIndex++] = p.r / 255.0;
+        inputBuffer[pixelIndex++] = p.g / 255.0;
+        inputBuffer[pixelIndex++] = p.b / 255.0;
+      }
+    }
+    return inputBuffer;
+  } catch (e) {
+    debugPrint("Preprocess error: $e");
+    return null;
   }
 }

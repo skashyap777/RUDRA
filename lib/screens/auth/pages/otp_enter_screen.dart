@@ -133,38 +133,7 @@ class _OtpEnterScreenState extends State<OtpEnterScreen> {
                   ),
                 ),
 
-                SizedBox(height: 20),
-                Row(
-                  spacing: 10,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text("-------------------------"),
-                    Text("or Sign in using"),
-                    Text("-------------------------"),
-                  ],
-                ),
-                SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      context.push("/completeProfile");
-                    },
-                    icon: Image.asset("assets/img/google.png", height: 20),
-                    label: const Text(
-                      'Google',
-                      style: TextStyle(color: Colors.black),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      side: const BorderSide(color: Colors.grey),
-                    ),
-                  ),
-                ),
+
               ],
             ),
           ),
