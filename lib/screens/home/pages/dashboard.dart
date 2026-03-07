@@ -480,6 +480,7 @@ class _DashboardState extends State<Dashboard> {
   }
 
   String _buildShortLocation(rudra_report.Data report) {
+    if (report.landmark != null && report.landmark!.isNotEmpty) return report.landmark!;
     if (report.roadName != null && report.roadName!.isNotEmpty) return report.roadName!;
     if (report.areaDetails != null && report.areaDetails!.isNotEmpty) return report.areaDetails!;
     if (report.districtName != null && report.districtName!.isNotEmpty) return report.districtName!;

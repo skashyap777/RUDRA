@@ -344,7 +344,7 @@ class _ReportState extends State<Report> {
                 ),
                 const SizedBox(height: 12),
 
-                // Location
+                // Location and Report ID
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -355,14 +355,39 @@ class _ReportState extends State<Report> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        _buildLocationString(report),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                          color: AppPallet.textPrimary,
-                          height: 1.3,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _buildLocationString(report),
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: AppPallet.textPrimary,
+                              height: 1.3,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          RichText(
+                            text: TextSpan(
+                              text: 'Report ID: ',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppPallet.textSecondary,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: report.caseNo ?? 'N/A',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppPallet.primaryColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -448,25 +473,11 @@ class _ReportState extends State<Report> {
   }
 
   String _buildLocationString(Data report) {
-    List<String> locationParts = [];
-
-    if (report.roadName != null) locationParts.add(report.roadName!);
-    if (report.subdivisionName != null)
-      locationParts.add(report.subdivisionName!);
-    if (report.divisionName != null) locationParts.add(report.divisionName!);
-    if (report.districtName != null) locationParts.add(report.districtName!);
-    if (report.stateName != null) locationParts.add(report.stateName!);
-
-    if (locationParts.isEmpty && report.areaDetails != null) {
-      return report.areaDetails!;
-    }
-
-    String location = locationParts.join(', ');
-    if (report.landmark != null && report.landmark!.isNotEmpty) {
-      location += ', ${report.landmark}';
-    }
-
-    return location.isNotEmpty ? location : 'Location not specified';
+    if (report.landmark != null && report.landmark!.isNotEmpty) return report.landmark!;
+    if (report.roadName != null && report.roadName!.isNotEmpty) return report.roadName!;
+    if (report.areaDetails != null && report.areaDetails!.isNotEmpty) return report.areaDetails!;
+    if (report.districtName != null && report.districtName!.isNotEmpty) return report.districtName!;
+    return 'Location not specified';
   }
 
   Color _getStatusColor(String status) {

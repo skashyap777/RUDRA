@@ -4,6 +4,7 @@ import 'package:rudra/config/theme/app_pallet.dart';
 import 'package:rudra/screens/notifications/models/notifiction_model.dart';
 import 'package:rudra/screens/notifications/provider/notification_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:rudra/screens/reports/pages/track_report_bottom_sheet.dart';
 
 class Notifications extends StatefulWidget {
   final void Function(String filter)? onNavigateToReports;
@@ -252,21 +253,43 @@ class _NotificationsState extends State<Notifications> {
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: () {
-            final status = notification.caseStatus?.toLowerCase().trim() ?? '';
-            // Map caseStatus to ReportProvider filter strings
-            String? filter;
-            if (status == 'in_progress' || status == 'in progress') {
-              filter = 'In progress';
-            } else if (status == 'completed' || status == 'complete') {
-              filter = 'Completed';
-            } else if (status == 'rejected' || status == 'reject') {
-              filter = 'Rejected';
-            } else if (status == 'submitted' || status == 'submit') {
-              filter = 'Submitted';
-            }
-            // Navigate to reports only for known statuses
-            if (filter != null) {
-              widget.onNavigateToReports?.call(filter);
+            final caseId = notification.caseId ?? 0;
+            final caseNo = notification.caseNo ?? '';
+
+            if (caseId != 0 && caseNo.isNotEmpty) {
+              HapticFeedback.lightImpact();
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom,
+                    top: MediaQuery.of(context).size.height * 0.2,
+                  ),
+                  child: TrackReportBottomSheet(
+                    caseId: caseId,
+                    caseNo: caseNo,
+                  ),
+                ),
+              );
+            } else {
+              final status = notification.caseStatus?.toLowerCase().trim() ?? '';
+              // Map caseStatus to ReportProvider filter strings
+              String? filter;
+              if (status == 'in_progress' || status == 'in progress') {
+                filter = 'In progress';
+              } else if (status == 'completed' || status == 'complete') {
+                filter = 'Completed';
+              } else if (status == 'rejected' || status == 'reject') {
+                filter = 'Rejected';
+              } else if (status == 'submitted' || status == 'submit') {
+                filter = 'Submitted';
+              }
+              // Navigate to reports only for known statuses
+              if (filter != null) {
+                widget.onNavigateToReports?.call(filter);
+              }
             }
           },
           child: Padding(
@@ -389,19 +412,18 @@ class _NotificationsState extends State<Notifications> {
     DateTime yesterday = today.subtract(const Duration(days: 1));
     DateTime notificationDateOnly = DateTime(dateTime.year, dateTime.month, dateTime.day);
 
-    if (notificationDateOnly == yesterday) {
+    if (notificationDateOnly == today) {
+      Duration difference = now.difference(dateTime);
+      if (difference.inMinutes < 60) {
+        if (difference.inMinutes <= 0) return 'Just now';
+        return '${difference.inMinutes} min ago';
+      } else {
+        return '${difference.inHours} hr ago';
+      }
+    } else if (notificationDateOnly == yesterday) {
       return 'Yesterday';
-    } else if (notificationDateOnly != today) {
-      return ''; // No string for dates older than yesterday according to design
-    }
-
-    Duration difference = now.difference(dateTime);
-
-    if (difference.inMinutes < 60) {
-      if (difference.inMinutes == 0) return 'Just now';
-      return '${difference.inMinutes} min ago';
     } else {
-      return '${difference.inHours} hr ago';
+      return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}';
     }
   }
 }

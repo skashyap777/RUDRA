@@ -69,7 +69,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     try {
       final response = await apiService.get(
-        url: "/admin/check-location-in-boundary?latitude=$latitude&longitude=$longitude",
+        url: "/admin/check-location-in-boundary-ios?latitude=$latitude&longitude=$longitude",
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         checkLocationData = CheckLocationModel.fromJson(response.data);
