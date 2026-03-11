@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,6 +19,7 @@ class Report extends StatefulWidget {
 class _ReportState extends State<Report> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -29,6 +31,7 @@ class _ReportState extends State<Report> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -53,16 +56,20 @@ class _ReportState extends State<Report> {
       body: Consumer<ReportProvider>(
         builder: (context, provider, child) {
           // 1. All reports matching the search query (to calculate filter counts)
-          final matchedReports = provider.reports.where((report) {
-            if (_searchQuery.isEmpty) return true;
-            return report.caseNo?.toString().toLowerCase().contains(_searchQuery.toLowerCase()) ?? false;
-          }).toList();
+          final matchedReports =
+              provider.reports.where((report) {
+                if (_searchQuery.isEmpty) return true;
+                return report.caseNo?.toString().toLowerCase().contains(
+                      _searchQuery.toLowerCase(),
+                    ) ??
+                    false;
+              }).toList();
 
-          // 2. The actually displayed reports (filtered by BOTH search AND selected chip)
-          final displayedReports = provider.filteredReports.where((report) {
-            if (_searchQuery.isEmpty) return true;
-            return report.caseNo?.toString().toLowerCase().contains(_searchQuery.toLowerCase()) ?? false;
-          }).toList();
+          // 2. The actually displayed reports
+          final displayedReports =
+              provider.isSearchMode
+                  ? provider.searchResults
+                  : provider.filteredReports;
 
           // 3. Dynamic counts depending on search state
           int allCount = provider.reportCounts?.all ?? 0;
@@ -73,10 +80,38 @@ class _ReportState extends State<Report> {
 
           if (_searchQuery.isNotEmpty) {
             allCount = matchedReports.length;
-            submittedCount = matchedReports.where((r) => r.status?.toLowerCase() == 'submitted' || r.status?.toLowerCase() == 'submit').length;
-            inProgressCount = matchedReports.where((r) => r.status?.toLowerCase() == 'in_progress' || r.status?.toLowerCase() == 'in progress').length;
-            completedCount = matchedReports.where((r) => r.status?.toLowerCase() == 'completed' || r.status?.toLowerCase() == 'complete').length;
-            rejectedCount = matchedReports.where((r) => r.status?.toLowerCase() == 'rejected' || r.status?.toLowerCase() == 'reject').length;
+            submittedCount =
+                matchedReports
+                    .where(
+                      (r) =>
+                          r.status?.toLowerCase() == 'submitted' ||
+                          r.status?.toLowerCase() == 'submit',
+                    )
+                    .length;
+            inProgressCount =
+                matchedReports
+                    .where(
+                      (r) =>
+                          r.status?.toLowerCase() == 'in_progress' ||
+                          r.status?.toLowerCase() == 'in progress',
+                    )
+                    .length;
+            completedCount =
+                matchedReports
+                    .where(
+                      (r) =>
+                          r.status?.toLowerCase() == 'completed' ||
+                          r.status?.toLowerCase() == 'complete',
+                    )
+                    .length;
+            rejectedCount =
+                matchedReports
+                    .where(
+                      (r) =>
+                          r.status?.toLowerCase() == 'rejected' ||
+                          r.status?.toLowerCase() == 'reject',
+                    )
+                    .length;
           }
 
           return Column(
@@ -91,21 +126,37 @@ class _ReportState extends State<Report> {
                     prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
+                      borderSide: BorderSide(
+                        color: Colors.grey.withOpacity(0.3),
+                      ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
+                      borderSide: BorderSide(
+                        color: Colors.grey.withOpacity(0.3),
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppPallet.primaryColor),
+                      borderSide: const BorderSide(
+                        color: AppPallet.primaryColor,
+                      ),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 0,
+                      horizontal: 16,
+                    ),
                   ),
                   onChanged: (value) {
                     setState(() {
                       _searchQuery = value;
+                    });
+                    if (_debounce?.isActive ?? false) _debounce!.cancel();
+                    _debounce = Timer(const Duration(milliseconds: 500), () {
+                      Provider.of<ReportProvider>(
+                        context,
+                        listen: false,
+                      ).searchReports(value);
                     });
                   },
                 ),
@@ -166,6 +217,10 @@ class _ReportState extends State<Report> {
               Expanded(
                 child:
                     provider.isLoading
+                        ? const Center(
+                          child: CircularProgressIndicator.adaptive(),
+                        )
+                        : provider.isSearchLoading
                         ? const Center(
                           child: CircularProgressIndicator.adaptive(),
                         )
@@ -334,7 +389,9 @@ class _ReportState extends State<Report> {
                       ),
                     ),
                     Text(
-                      _formatDateTime(report.createdAt ?? ''),
+                      _formatDateTime(
+                        report.caseCreatedAt ?? report.createdAt ?? '',
+                      ),
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppPallet.textSecondary,
@@ -405,16 +462,18 @@ class _ReportState extends State<Report> {
                           context: context,
                           isScrollControlled: true,
                           backgroundColor: Colors.transparent,
-                          builder: (context) => Padding(
-                            padding: EdgeInsets.only(
-                              bottom: MediaQuery.of(context).viewInsets.bottom,
-                              top: MediaQuery.of(context).size.height * 0.2,
-                            ),
-                            child: TrackReportBottomSheet(
-                              caseId: report.id ?? 0,
-                              caseNo: report.caseNo ?? '',
-                            ),
-                          ),
+                          builder:
+                              (context) => Padding(
+                                padding: EdgeInsets.only(
+                                  bottom:
+                                      MediaQuery.of(context).viewInsets.bottom,
+                                  top: MediaQuery.of(context).size.height * 0.2,
+                                ),
+                                child: TrackReportBottomSheet(
+                                  caseId: report.id ?? 0,
+                                  caseNo: report.caseNo ?? '',
+                                ),
+                              ),
                         );
                       },
                       icon: const Icon(Icons.timeline_outlined, size: 18),
@@ -424,7 +483,16 @@ class _ReportState extends State<Report> {
                       ),
                     ),
                     TextButton.icon(
-                      onPressed: () => _showImageViewer(context, report),
+                      onPressed: () {
+                        final isCompleted =
+                            report.status?.toLowerCase() == 'completed' ||
+                            report.status?.toLowerCase() == 'complete';
+                        _showImageViewer(
+                          context,
+                          report,
+                          showAfterFix: isCompleted,
+                        );
+                      },
                       icon: const Icon(Icons.image_outlined, size: 18),
                       label: const Text("View Image"),
                       style: TextButton.styleFrom(
@@ -434,7 +502,8 @@ class _ReportState extends State<Report> {
                   ],
                 ),
                 if (report.feedBackProvided == false &&
-                    (report.status?.toLowerCase() == 'completed' || report.status?.toLowerCase() == 'complete')) ...[
+                    (report.status?.toLowerCase() == 'completed' ||
+                        report.status?.toLowerCase() == 'complete')) ...[
                   const Divider(height: 24),
                   SizedBox(
                     width: double.infinity,
@@ -446,7 +515,7 @@ class _ReportState extends State<Report> {
                           barrierDismissible: false,
                           builder: (BuildContext context) {
                             return FeedbackForm(
-                              caseId: "${report.caseNo}",
+                              caseId: report.id ?? 0,
                               onSubmitted: () {},
                             );
                           },
@@ -473,10 +542,12 @@ class _ReportState extends State<Report> {
   }
 
   String _buildLocationString(Data report) {
-    if (report.landmark != null && report.landmark!.isNotEmpty) return report.landmark!;
-    if (report.roadName != null && report.roadName!.isNotEmpty) return report.roadName!;
-    if (report.areaDetails != null && report.areaDetails!.isNotEmpty) return report.areaDetails!;
-    if (report.districtName != null && report.districtName!.isNotEmpty) return report.districtName!;
+    if (report.areaDetails != null && report.areaDetails!.isNotEmpty)
+      return report.areaDetails!;
+    if (report.roadName != null && report.roadName!.isNotEmpty)
+      return report.roadName!;
+    if (report.districtName != null && report.districtName!.isNotEmpty)
+      return report.districtName!;
     return 'Location not specified';
   }
 
@@ -520,7 +591,7 @@ class _ReportState extends State<Report> {
 
   String _formatDateTime(String dateTimeString) {
     try {
-      DateTime dateTime = DateTime.parse(dateTimeString);
+      DateTime dateTime = DateTime.parse(dateTimeString).toLocal();
       return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year} ${_formatTime(dateTime)}';
     } catch (e) {
       return '--:--';
@@ -550,8 +621,44 @@ class _ReportState extends State<Report> {
     return '$baseUrl$cleanPath';
   }
 
-  void _showImageViewer(BuildContext context, Data report) {
-    if (report.images == null || report.images!.isEmpty) {
+  void _showImageViewer(
+    BuildContext context,
+    Data report, {
+    bool showAfterFix = false,
+  }) {
+    // Collect after-fix photos from all officer reports
+    final afterFixUrls = <String>[];
+    if (showAfterFix && report.officerReports != null) {
+      for (final officer in report.officerReports!) {
+        if (officer.afterFixPhotos != null) {
+          for (final photo in officer.afterFixPhotos!) {
+            if (photo.photoUrl != null && photo.photoUrl!.isNotEmpty) {
+              afterFixUrls.add(_getFullImageUrl(photo.photoUrl!));
+            }
+          }
+        }
+      }
+    }
+
+    // Citizen-submitted photos
+    final citizenUrls =
+        (report.images ?? [])
+            .where((img) => img.imageUrl != null && img.imageUrl!.isNotEmpty)
+            .map((img) => _getFullImageUrl(img.imageUrl!))
+            .toList();
+
+    // Decide what to show
+    final bool hasAfterFix = afterFixUrls.isNotEmpty;
+    final List<String> displayUrls =
+        showAfterFix && hasAfterFix ? afterFixUrls : citizenUrls;
+    final String title =
+        showAfterFix && hasAfterFix
+            ? 'After Fix Photos'
+            : showAfterFix
+            ? 'Submitted Photos (After fix not available yet)'
+            : 'Submitted Photos';
+
+    if (displayUrls.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No images available for this report'),
@@ -567,20 +674,25 @@ class _ReportState extends State<Report> {
         return Dialog(
           child: Container(
             width: double.infinity,
-            height: 400,
+            height: 420,
             child: Column(
               children: [
                 // Header
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Report Images',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                       IconButton(
@@ -594,7 +706,7 @@ class _ReportState extends State<Report> {
                 // Images
                 Expanded(
                   child: PageView.builder(
-                    itemCount: report.images!.length,
+                    itemCount: displayUrls.length,
                     itemBuilder: (context, index) {
                       return Container(
                         margin: const EdgeInsets.all(16),
@@ -605,27 +717,25 @@ class _ReportState extends State<Report> {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
                           child: Image.network(
-                            _getFullImageUrl(
-                              report.images![index].imageUrl ?? '',
-                            ),
+                            displayUrls[index],
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) {
                               return Container(
                                 color: Colors.grey[200],
-                                child: Center(
+                                child: const Center(
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      const Icon(
+                                      Icon(
                                         Icons.image_not_supported,
                                         size: 50,
                                         color: Colors.grey,
                                       ),
-                                      const SizedBox(height: 8),
+                                      SizedBox(height: 8),
                                       Text(
                                         'Failed to load image',
                                         style: TextStyle(
-                                          color: Colors.grey[600],
+                                          color: Colors.grey,
                                           fontSize: 12,
                                         ),
                                       ),
@@ -656,14 +766,25 @@ class _ReportState extends State<Report> {
                   ),
                 ),
 
-                // Image counter
-                if (report.images!.length > 1)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      '${report.images!.length} images',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                    ),
+                // Counter + label
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    displayUrls.length > 1
+                        ? '${displayUrls.length} photos'
+                        : '1 photo',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                ),
+
+                // For completed: also offer to view citizen photos
+                if (showAfterFix && hasAfterFix && citizenUrls.isNotEmpty)
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showImageViewer(context, report, showAfterFix: false);
+                    },
+                    child: const Text('View original submitted photo'),
                   ),
               ],
             ),

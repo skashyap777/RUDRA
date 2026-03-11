@@ -50,6 +50,7 @@ dependencies:
   tflite_flutter: ^0.12.1
   flutter_launcher_icons: ^0.14.2
   upgrader: ^12.5.0
+  flutter_local_notifications: ^21.0.0
 
 dev_dependencies:
   flutter_test:

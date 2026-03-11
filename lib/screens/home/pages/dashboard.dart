@@ -8,7 +8,8 @@ import 'package:rudra/config/constants/api_constants.dart';
 import 'package:rudra/config/utils/app_functions.dart';
 import 'package:rudra/config/utils/assets.dart';
 import 'package:rudra/screens/home/provider/home_provider.dart';
-import 'package:rudra/screens/reports/provider/report_provider.dart' as rudra_report;
+import 'package:rudra/screens/reports/provider/report_provider.dart'
+    as rudra_report;
 import 'package:rudra/screens/reports/models/report_model.dart' as rudra_report;
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
@@ -49,7 +50,10 @@ class _DashboardState extends State<Dashboard> {
     getUserDetails();
     // Fetch recent reports to display in the list
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<rudra_report.ReportProvider>(context, listen: false).fetchReports();
+      Provider.of<rudra_report.ReportProvider>(
+        context,
+        listen: false,
+      ).fetchReports();
       Provider.of<HomeProvider>(context, listen: false).getUserDetails();
     });
     // Pre-load the model so it's ready when user taps capture
@@ -99,40 +103,47 @@ class _DashboardState extends State<Dashboard> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(30),
-                        child: store.userdetails?.profilePhotoLink != null && store.userdetails?.profilePhotoLink != 'null'
-                            ? Image.network(
-                                "${ApiConstants.imageBaseUrl}${store.userdetails!.profilePhotoLink}",
-                                width: 50,
-                                height: 50,
-                                fit: BoxFit.cover,
-                                loadingBuilder: (context, child, loadingProgress) {
-                                  if (loadingProgress == null) return child;
-                                  return const SizedBox(
-                                    width: 50,
-                                    height: 50,
-                                    child: Center(
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 2,
+                        child:
+                            store.userdetails?.profilePhotoLink != null &&
+                                    store.userdetails?.profilePhotoLink !=
+                                        'null'
+                                ? Image.network(
+                                  "${ApiConstants.imageBaseUrl}${store.userdetails!.profilePhotoLink}",
+                                  width: 50,
+                                  height: 50,
+                                  fit: BoxFit.cover,
+                                  loadingBuilder: (
+                                    context,
+                                    child,
+                                    loadingProgress,
+                                  ) {
+                                    if (loadingProgress == null) return child;
+                                    return const SizedBox(
+                                      width: 50,
+                                      height: 50,
+                                      child: Center(
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                },
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Image.asset(
-                                    Assets.profile,
-                                    width: 50,
-                                    height: 50,
-                                    fit: BoxFit.cover,
-                                  );
-                                },
-                              )
-                            : Image.asset(
-                                Assets.profile,
-                                width: 50,
-                                height: 50,
-                                fit: BoxFit.cover,
-                              ),
+                                    );
+                                  },
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Image.asset(
+                                      Assets.profile,
+                                      width: 50,
+                                      height: 50,
+                                      fit: BoxFit.cover,
+                                    );
+                                  },
+                                )
+                                : Image.asset(
+                                  Assets.profile,
+                                  width: 50,
+                                  height: 50,
+                                  fit: BoxFit.cover,
+                                ),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -337,7 +348,8 @@ class _DashboardState extends State<Dashboard> {
                           }
 
                           // Get up to 3 most recent reports
-                          final recentReports = reportStore.reports.take(3).toList();
+                          final recentReports =
+                              reportStore.reports.take(3).toList();
 
                           return ListView.builder(
                             shrinkWrap: true,
@@ -364,12 +376,16 @@ class _DashboardState extends State<Dashboard> {
                                     width: 48,
                                     height: 48,
                                     decoration: BoxDecoration(
-                                      color: _getStatusColor(report.status ?? '').withOpacity(0.1),
+                                      color: _getStatusColor(
+                                        report.status ?? '',
+                                      ).withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Icon(
                                       _getStatusIcon(report.status ?? ''),
-                                      color: _getStatusColor(report.status ?? ''),
+                                      color: _getStatusColor(
+                                        report.status ?? '',
+                                      ),
                                     ),
                                   ),
                                   title: Text(
@@ -391,12 +407,16 @@ class _DashboardState extends State<Dashboard> {
                                           style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w500,
-                                            color: _getStatusColor(report.status ?? ''),
+                                            color: _getStatusColor(
+                                              report.status ?? '',
+                                            ),
                                           ),
                                         ),
                                         const SizedBox(width: 8),
                                         Text(
-                                          _formatShortDate(report.createdAt ?? ''),
+                                          _formatShortDate(
+                                            report.createdAt ?? '',
+                                          ),
                                           style: const TextStyle(
                                             fontSize: 12,
                                             color: AppPallet.textSecondary,
@@ -472,7 +492,7 @@ class _DashboardState extends State<Dashboard> {
 
   String _formatShortDate(String dateTimeString) {
     try {
-      DateTime dateTime = DateTime.parse(dateTimeString);
+      DateTime dateTime = DateTime.parse(dateTimeString).toLocal();
       return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}';
     } catch (e) {
       return '';
@@ -480,10 +500,12 @@ class _DashboardState extends State<Dashboard> {
   }
 
   String _buildShortLocation(rudra_report.Data report) {
-    if (report.landmark != null && report.landmark!.isNotEmpty) return report.landmark!;
-    if (report.roadName != null && report.roadName!.isNotEmpty) return report.roadName!;
-    if (report.areaDetails != null && report.areaDetails!.isNotEmpty) return report.areaDetails!;
-    if (report.districtName != null && report.districtName!.isNotEmpty) return report.districtName!;
+    if (report.areaDetails != null && report.areaDetails!.isNotEmpty)
+      return report.areaDetails!;
+    if (report.roadName != null && report.roadName!.isNotEmpty)
+      return report.roadName!;
+    if (report.districtName != null && report.districtName!.isNotEmpty)
+      return report.districtName!;
     return 'Location not specified';
   }
 }
@@ -500,7 +522,7 @@ class PotholeDetector {
   Interpreter? _interpreter;
   List<String> _labels = [];
   bool _isLoaded = false;
-  bool _isLoading = false;          // prevents concurrent loadModel() calls
+  bool _isLoading = false; // prevents concurrent loadModel() calls
   String _lastError = '';
 
   final int inputSize = 640;
@@ -509,9 +531,8 @@ class PotholeDetector {
   String get lastError => _lastError;
   bool get isLoaded => _isLoaded;
   List<String> get labelsList => _labels;
-  String get inputInfo => _interpreter != null
-      ? 'Interpreter ready'
-      : 'Interpreter not created';
+  String get inputInfo =>
+      _interpreter != null ? 'Interpreter ready' : 'Interpreter not created';
 
   // ── Load Model (idempotent) ────────────────────────────────────────
   Future<void> loadModel() async {
@@ -533,18 +554,23 @@ class PotholeDetector {
 
     try {
       // 1. Verify asset bytes exist (catches missing-asset early)
-      final modelBytes = await rootBundle.load('assets/model/best_float32.tflite');
+      final modelBytes = await rootBundle.load(
+        'assets/model/best_float32.tflite',
+      );
 
       // 2. Create interpreter from asset
-      _interpreter = await Interpreter.fromAsset('assets/model/best_float32.tflite');
+      _interpreter = await Interpreter.fromAsset(
+        'assets/model/best_float32.tflite',
+      );
 
       // 4. Load labels
       final labelsRaw = await rootBundle.loadString('assets/model/labels.txt');
-      _labels = labelsRaw
-          .split('\n')
-          .map((e) => e.trim())
-          .where((e) => e.isNotEmpty)
-          .toList();
+      _labels =
+          labelsRaw
+              .split('\n')
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty)
+              .toList();
 
       _isLoaded = true;
     } catch (e, st) {
@@ -582,7 +608,8 @@ class PotholeDetector {
         'inputSize': inputSize,
       });
 
-      if (inputBuffer == null) return 'Invalid image format or processing failed';
+      if (inputBuffer == null)
+        return 'Invalid image format or processing failed';
 
       // 6. Reshape input to [1, 640, 640, 3]
       final inputTensor = inputBuffer.reshape([1, inputSize, inputSize, 3]);
@@ -590,8 +617,12 @@ class PotholeDetector {
       // ── DIAGNOSTIC: Log actual tensor shapes from the interpreter ──
       final inputTensorInfo = _interpreter!.getInputTensor(0);
       final outputTensorInfo = _interpreter!.getOutputTensor(0);
-      debugPrint('📐 INPUT tensor shape: ${inputTensorInfo.shape}, type: ${inputTensorInfo.type}');
-      debugPrint('📐 OUTPUT tensor shape: ${outputTensorInfo.shape}, type: ${outputTensorInfo.type}');
+      debugPrint(
+        '📐 INPUT tensor shape: ${inputTensorInfo.shape}, type: ${inputTensorInfo.type}',
+      );
+      debugPrint(
+        '📐 OUTPUT tensor shape: ${outputTensorInfo.shape}, type: ${outputTensorInfo.type}',
+      );
 
       final outputShape = outputTensorInfo.shape;
       final int dim1 = outputShape.length >= 2 ? outputShape[1] : 0;
@@ -603,16 +634,27 @@ class PotholeDetector {
 
       if (dim1 == 5 && dim2 == 8400) {
         // Standard YOLO: [1, 5, 8400]
-        output = List.generate(1, (_) => List.generate(5, (_) => List.filled(8400, 0.0)));
+        output = List.generate(
+          1,
+          (_) => List.generate(5, (_) => List.filled(8400, 0.0)),
+        );
         isTransposed = false;
       } else if (dim1 == 8400 && dim2 == 5) {
         // Transposed: [1, 8400, 5]
-        output = List.generate(1, (_) => List.generate(8400, (_) => List.filled(5, 0.0)));
+        output = List.generate(
+          1,
+          (_) => List.generate(8400, (_) => List.filled(5, 0.0)),
+        );
         isTransposed = true;
       } else {
         // Unknown shape — try standard [1, 5, 8400] as fallback
-        debugPrint('⚠️ Unexpected output shape: $outputShape, trying [1, 5, 8400]');
-        output = List.generate(1, (_) => List.generate(5, (_) => List.filled(8400, 0.0)));
+        debugPrint(
+          '⚠️ Unexpected output shape: $outputShape, trying [1, 5, 8400]',
+        );
+        output = List.generate(
+          1,
+          (_) => List.generate(5, (_) => List.filled(8400, 0.0)),
+        );
         isTransposed = false;
       }
 
@@ -621,8 +663,12 @@ class PotholeDetector {
 
       // ── DIAGNOSTIC: Dump sample raw output values ──
       if (!isTransposed) {
-        debugPrint('📊 Sample output[0][0][0..4] (bbox x): ${output[0][0].sublist(0, 5)}');
-        debugPrint('📊 Sample output[0][4][0..4] (conf):    ${output[0][4].sublist(0, 5)}');
+        debugPrint(
+          '📊 Sample output[0][0][0..4] (bbox x): ${output[0][0].sublist(0, 5)}',
+        );
+        debugPrint(
+          '📊 Sample output[0][4][0..4] (conf):    ${output[0][4].sublist(0, 5)}',
+        );
       } else {
         debugPrint('📊 Sample output[0][0][0..4] (box0):    ${output[0][0]}');
         debugPrint('📊 Sample output[0][1][0..4] (box1):    ${output[0][1]}');
@@ -651,7 +697,9 @@ class PotholeDetector {
       final String topLabel = _labels.isNotEmpty ? _labels[0] : 'Pothole';
       final String pct = (maxConfidence * 100).toStringAsFixed(1);
 
-      debugPrint('🔍 Shape: ${isTransposed ? "[1,8400,5]" : "[1,5,8400]"} | Max conf: $pct% | High conf: $highConfCount | Threshold: ${(confidenceThreshold * 100).toStringAsFixed(0)}%');
+      debugPrint(
+        '🔍 Shape: ${isTransposed ? "[1,8400,5]" : "[1,5,8400]"} | Max conf: $pct% | High conf: $highConfCount | Threshold: ${(confidenceThreshold * 100).toStringAsFixed(0)}%',
+      );
 
       // 10. Detection decision
       if (maxConfidence >= confidenceThreshold || highConfCount > 0) {
@@ -673,7 +721,7 @@ class PotholeDetector {
   }
 }
 
-/// Runs in a background isolate to prevent UI frame drops 
+/// Runs in a background isolate to prevent UI frame drops
 /// while applying heavyweight image manipulation and interpolation.
 Float32List? _preprocessImage(Map<String, dynamic> params) {
   try {
@@ -702,7 +750,11 @@ Float32List? _preprocessImage(Map<String, dynamic> params) {
     );
 
     // 4. Resize to 640x640
-    final resized = img.copyResize(cropped, width: inputSize, height: inputSize);
+    final resized = img.copyResize(
+      cropped,
+      width: inputSize,
+      height: inputSize,
+    );
 
     // 5. Normalize pixels to [0, 1] into a flat Float32List
     final inputBuffer = Float32List(1 * inputSize * inputSize * 3);
