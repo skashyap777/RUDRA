@@ -211,12 +211,25 @@ class _NotificationsState extends State<Notifications> {
                                     ),
                                   ),
                                   onDismissed: (direction) async {
-                                    final success = await Provider.of<NotificationProvider>(context, listen: false).deleteNotification(notification.id!);
+                                    final success =
+                                        await Provider.of<NotificationProvider>(
+                                          context,
+                                          listen: false,
+                                        ).deleteNotification(notification.id!);
                                     if (!success && context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Failed to delete notification')),
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Failed to delete notification',
+                                          ),
+                                        ),
                                       );
-                                      Provider.of<NotificationProvider>(context, listen: false).fetchNotifications();
+                                      Provider.of<NotificationProvider>(
+                                        context,
+                                        listen: false,
+                                      ).fetchNotifications();
                                     }
                                   },
                                   child: _buildNotificationCard(
@@ -262,19 +275,21 @@ class _NotificationsState extends State<Notifications> {
                 context: context,
                 isScrollControlled: true,
                 backgroundColor: Colors.transparent,
-                builder: (context) => Padding(
-                  padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(context).viewInsets.bottom,
-                    top: MediaQuery.of(context).size.height * 0.2,
-                  ),
-                  child: TrackReportBottomSheet(
-                    caseId: caseId,
-                    caseNo: caseNo,
-                  ),
-                ),
+                builder:
+                    (context) => Padding(
+                      padding: EdgeInsets.only(
+                        bottom: MediaQuery.of(context).viewInsets.bottom,
+                        top: MediaQuery.of(context).size.height * 0.2,
+                      ),
+                      child: TrackReportBottomSheet(
+                        caseId: caseId,
+                        caseNo: caseNo,
+                      ),
+                    ),
               );
             } else {
-              final status = notification.caseStatus?.toLowerCase().trim() ?? '';
+              final status =
+                  notification.caseStatus?.toLowerCase().trim() ?? '';
               // Map caseStatus to ReportProvider filter strings
               String? filter;
               if (status == 'in_progress' || status == 'in progress') {
@@ -352,6 +367,51 @@ class _NotificationsState extends State<Notifications> {
                           height: 1.4,
                         ),
                       ),
+                      // Feedback button for completed/closed cases
+                      if (_isCompletedNotification(notification) &&
+                          notification.feedBackProvided != true &&
+                          notification.caseNo != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: GestureDetector(
+                            onTap: () {
+                              HapticFeedback.mediumImpact();
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (BuildContext context) {
+                                  return FeedbackForm(
+                                    caseId: notification.caseId!,
+                                    onSubmitted: () {
+                                      Provider.of<NotificationProvider>(
+                                        context,
+                                        listen: false,
+                                      ).fetchNotifications();
+                                    },
+                                  );
+                                },
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppPallet.primaryColor,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                'Give Feedback',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -363,6 +423,19 @@ class _NotificationsState extends State<Notifications> {
     );
   }
 
+  bool _isCompletedNotification(Data notification) {
+    final status = notification.caseStatus?.toLowerCase().trim() ?? '';
+    final type = notification.type?.toLowerCase().trim() ?? '';
+    return status == 'completed' ||
+        status == 'complete' ||
+        status == 'closed' ||
+        type == 'completed' ||
+        type == 'complete' ||
+        type == 'case_completed' ||
+        type == 'completion' ||
+        type.contains('complet');
+  }
+
   Map<String, List<Data>> _groupNotificationsByDate(List<Data> notifications) {
     Map<String, List<Data>> grouped = {};
     DateTime now = DateTime.now();
@@ -370,9 +443,8 @@ class _NotificationsState extends State<Notifications> {
     DateTime yesterday = today.subtract(const Duration(days: 1));
 
     for (var notification in notifications) {
-      DateTime? notificationDate = DateTime.tryParse(
-        notification.createdAt ?? '',
-      );
+      DateTime? notificationDate =
+          DateTime.tryParse(notification.createdAt ?? '')?.toLocal();
       if (notificationDate != null) {
         DateTime dateOnly = DateTime(
           notificationDate.year,
@@ -386,7 +458,8 @@ class _NotificationsState extends State<Notifications> {
         } else if (dateOnly == yesterday) {
           dateKey = 'Yesterday';
         } else {
-          dateKey = '${dateOnly.year}-${dateOnly.month.toString().padLeft(2, '0')}-${dateOnly.day.toString().padLeft(2, '0')}';
+          dateKey =
+              '${dateOnly.year}-${dateOnly.month.toString().padLeft(2, '0')}-${dateOnly.day.toString().padLeft(2, '0')}';
         }
 
         if (!grouped.containsKey(dateKey)) {
@@ -404,13 +477,17 @@ class _NotificationsState extends State<Notifications> {
   }
 
   String _formatTime(String dateTimeString) {
-    DateTime? dateTime = DateTime.tryParse(dateTimeString);
+    DateTime? dateTime = DateTime.tryParse(dateTimeString)?.toLocal();
     if (dateTime == null) return '';
 
     DateTime now = DateTime.now();
     DateTime today = DateTime(now.year, now.month, now.day);
     DateTime yesterday = today.subtract(const Duration(days: 1));
-    DateTime notificationDateOnly = DateTime(dateTime.year, dateTime.month, dateTime.day);
+    DateTime notificationDateOnly = DateTime(
+      dateTime.year,
+      dateTime.month,
+      dateTime.day,
+    );
 
     if (notificationDateOnly == today) {
       Duration difference = now.difference(dateTime);
@@ -429,7 +506,7 @@ class _NotificationsState extends State<Notifications> {
 }
 
 class FeedbackForm extends StatefulWidget {
-  final String caseId;
+  final int caseId;
   final VoidCallback? onSubmitted;
 
   const FeedbackForm({Key? key, required this.caseId, this.onSubmitted})
@@ -444,9 +521,9 @@ class _FeedbackFormState extends State<FeedbackForm> {
   final TextEditingController _feedbackController = TextEditingController();
 
   final List<Map<String, dynamic>> ratings = [
-    {'label': 'Bad',     'emoji': '😞', 'value': 'Bad'},
-    {'label': 'Okay',    'emoji': '😐', 'value': 'Okay'},
-    {'label': 'Good',    'emoji': '😊', 'value': 'Good'},
+    {'label': 'Bad', 'emoji': '😞', 'value': 'Bad'},
+    {'label': 'Okay', 'emoji': '😐', 'value': 'Okay'},
+    {'label': 'Good', 'emoji': '😊', 'value': 'Good'},
     {'label': 'Amazing', 'emoji': '😁', 'value': 'Amazing'},
   ];
 
@@ -460,7 +537,7 @@ class _FeedbackFormState extends State<FeedbackForm> {
     HapticFeedback.mediumImpact();
     if (selectedRating != null) {
       Provider.of<NotificationProvider>(context, listen: false).submitFeedback(
-        int.parse(widget.caseId.split('-').last),
+        widget.caseId,
         selectedRating!,
         _feedbackController.text,
       );
@@ -523,8 +600,9 @@ class _FeedbackFormState extends State<FeedbackForm> {
                     tween: Tween(begin: 0.4, end: 1.0),
                     duration: const Duration(milliseconds: 600),
                     curve: Curves.elasticOut,
-                    builder: (_, scale, child) =>
-                        Transform.scale(scale: scale, child: child),
+                    builder:
+                        (_, scale, child) =>
+                            Transform.scale(scale: scale, child: child),
                     child: Container(
                       width: 70,
                       height: 70,
@@ -575,16 +653,19 @@ class _FeedbackFormState extends State<FeedbackForm> {
                   // ── Animated emoji rating row ─────────────────
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: ratings.map((rating) {
-                      final isSelected = selectedRating == rating['value'];
-                      return _AnimatedEmojiOption(
-                        emoji: rating['emoji'],
-                        label: rating['label'],
-                        isSelected: isSelected,
-                        onTap: () =>
-                            setState(() => selectedRating = rating['value']),
-                      );
-                    }).toList(),
+                    children:
+                        ratings.map((rating) {
+                          final isSelected = selectedRating == rating['value'];
+                          return _AnimatedEmojiOption(
+                            emoji: rating['emoji'],
+                            label: rating['label'],
+                            isSelected: isSelected,
+                            onTap:
+                                () => setState(
+                                  () => selectedRating = rating['value'],
+                                ),
+                          );
+                        }).toList(),
                   ),
                   const SizedBox(height: 26),
 
@@ -595,28 +676,35 @@ class _FeedbackFormState extends State<FeedbackForm> {
                       duration: const Duration(milliseconds: 250),
                       height: 52,
                       decoration: BoxDecoration(
-                        gradient: selectedRating != null
-                            ? const LinearGradient(
-                                colors: [Color(0xFF34C759), Color(0xFF248A3D)],
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                              )
-                            : LinearGradient(
-                                colors: [
-                                  Colors.grey.shade200,
-                                  Colors.grey.shade200,
-                                ],
-                              ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: selectedRating != null
-                            ? [
-                                BoxShadow(
-                                  color: const Color(0xFF34C759).withOpacity(0.4),
-                                  blurRadius: 14,
-                                  offset: const Offset(0, 5),
+                        gradient:
+                            selectedRating != null
+                                ? const LinearGradient(
+                                  colors: [
+                                    Color(0xFF34C759),
+                                    Color(0xFF248A3D),
+                                  ],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                )
+                                : LinearGradient(
+                                  colors: [
+                                    Colors.grey.shade200,
+                                    Colors.grey.shade200,
+                                  ],
                                 ),
-                              ]
-                            : [],
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow:
+                            selectedRating != null
+                                ? [
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFF34C759,
+                                    ).withOpacity(0.4),
+                                    blurRadius: 14,
+                                    offset: const Offset(0, 5),
+                                  ),
+                                ]
+                                : [],
                       ),
                       child: Center(
                         child: Text(
@@ -624,9 +712,10 @@ class _FeedbackFormState extends State<FeedbackForm> {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: selectedRating != null
-                                ? Colors.white
-                                : Colors.grey.shade400,
+                            color:
+                                selectedRating != null
+                                    ? Colors.white
+                                    : Colors.grey.shade400,
                             letterSpacing: -0.2,
                           ),
                         ),
@@ -686,9 +775,10 @@ class _AnimatedEmojiOptionState extends State<_AnimatedEmojiOption>
       vsync: this,
       duration: const Duration(milliseconds: 450),
     );
-    _scale = Tween<double>(begin: 1.0, end: 1.35).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut),
-    );
+    _scale = Tween<double>(
+      begin: 1.0,
+      end: 1.35,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut));
   }
 
   @override
@@ -718,14 +808,16 @@ class _AnimatedEmojiOptionState extends State<_AnimatedEmojiOption>
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
         decoration: BoxDecoration(
-          color: widget.isSelected
-              ? const Color(0xFF34C759).withOpacity(0.1)
-              : Colors.grey.shade50,
+          color:
+              widget.isSelected
+                  ? const Color(0xFF34C759).withOpacity(0.1)
+                  : Colors.grey.shade50,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: widget.isSelected
-                ? const Color(0xFF34C759)
-                : Colors.grey.shade200,
+            color:
+                widget.isSelected
+                    ? const Color(0xFF34C759)
+                    : Colors.grey.shade200,
             width: widget.isSelected ? 2 : 1,
           ),
         ),
@@ -741,9 +833,10 @@ class _AnimatedEmojiOptionState extends State<_AnimatedEmojiOption>
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: widget.isSelected
-                    ? const Color(0xFF34C759)
-                    : Colors.grey.shade500,
+                color:
+                    widget.isSelected
+                        ? const Color(0xFF34C759)
+                        : Colors.grey.shade500,
               ),
             ),
           ],
@@ -757,7 +850,7 @@ class _AnimatedEmojiOptionState extends State<_AnimatedEmojiOption>
 class FeedbackExample extends StatelessWidget {
   const FeedbackExample({Key? key}) : super(key: key);
 
-  void _showFeedbackDialog(BuildContext context, String caseId) {
+  void _showFeedbackDialog(BuildContext context, int caseId) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -765,7 +858,7 @@ class FeedbackExample extends StatelessWidget {
         return FeedbackForm(
           caseId: caseId,
           onSubmitted: () {
-            print('Feedback submitted successfully');
+            debugPrint('Feedback submitted successfully');
           },
         );
       },
@@ -778,8 +871,7 @@ class FeedbackExample extends StatelessWidget {
       appBar: AppBar(title: const Text('Feedback Example')),
       body: Center(
         child: ElevatedButton(
-          onPressed:
-              () => _showFeedbackDialog(context, 'IN1-AST-KA19-213-00164'),
+          onPressed: () => _showFeedbackDialog(context, 164),
           child: const Text('Show Feedback Form'),
         ),
       ),

@@ -45,7 +45,8 @@ class _TrackReportBottomSheetState extends State<TrackReportBottomSheet> {
       } else {
         if (mounted) {
           setState(() {
-            _errorMessage = response.data['message'] ?? 'Failed to load tracking info';
+            _errorMessage =
+                response.data['message'] ?? 'Failed to load tracking info';
             _isLoading = false;
           });
         }
@@ -53,7 +54,8 @@ class _TrackReportBottomSheetState extends State<TrackReportBottomSheet> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'An error occurred while loading tracking information.';
+          _errorMessage =
+              'An error occurred while loading tracking information.';
           _isLoading = false;
         });
       }
@@ -81,13 +83,16 @@ class _TrackReportBottomSheetState extends State<TrackReportBottomSheet> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          
+
           Expanded(
             child: CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 8,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -112,7 +117,9 @@ class _TrackReportBottomSheetState extends State<TrackReportBottomSheet> {
                           const Center(
                             child: Padding(
                               padding: EdgeInsets.all(40),
-                              child: CircularProgressIndicator(color: AppPallet.primaryColor),
+                              child: CircularProgressIndicator(
+                                color: AppPallet.primaryColor,
+                              ),
                             ),
                           )
                         else if (_errorMessage != null)
@@ -121,7 +128,10 @@ class _TrackReportBottomSheetState extends State<TrackReportBottomSheet> {
                               padding: const EdgeInsets.all(40),
                               child: Text(
                                 _errorMessage!,
-                                style: const TextStyle(color: Colors.red, fontSize: 16),
+                                style: const TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 16,
+                                ),
                                 textAlign: TextAlign.center,
                               ),
                             ),
@@ -132,11 +142,18 @@ class _TrackReportBottomSheetState extends State<TrackReportBottomSheet> {
                               padding: const EdgeInsets.all(40),
                               child: Column(
                                 children: [
-                                  Icon(Icons.info_outline, size: 48, color: Colors.grey[400]),
+                                  Icon(
+                                    Icons.info_outline,
+                                    size: 48,
+                                    color: Colors.grey[400],
+                                  ),
                                   const SizedBox(height: 16),
                                   Text(
                                     'No tracking updates found for this report yet.',
-                                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 16,
+                                    ),
                                     textAlign: TextAlign.center,
                                   ),
                                 ],
@@ -166,18 +183,19 @@ class _TrackReportBottomSheetState extends State<TrackReportBottomSheet> {
         final item = _trackingData[index];
         final isLast = index == _trackingData.length - 1;
         final isFirst = index == 0;
-        
+
         // Determine icons and colors based on task/status
         final task = item['task']?.toString() ?? '';
         final status = item['case_status']?.toString() ?? '';
-        
+
         IconData iconData = Icons.circle;
         Color iconColor = AppPallet.primaryColor;
-        
+
         if (task.toLowerCase().contains('rejected')) {
           iconData = Icons.cancel;
           iconColor = Colors.red;
-        } else if (task.toLowerCase().contains('closed') || status.toLowerCase() == 'completed') {
+        } else if (task.toLowerCase().contains('closed') ||
+            status.toLowerCase() == 'completed') {
           iconData = Icons.check_circle;
           iconColor = Colors.green;
         } else if (task.toLowerCase().contains('submitted')) {
@@ -199,31 +217,24 @@ class _TrackReportBottomSheetState extends State<TrackReportBottomSheet> {
                   children: [
                     // Top line
                     if (!isFirst)
-                      Container(
-                        width: 2,
-                        height: 20,
-                        color: Colors.grey[300],
-                      )
+                      Container(width: 2, height: 20, color: Colors.grey[300])
                     else
                       const SizedBox(height: 20),
-                    
+
                     // Icon
                     Icon(iconData, color: iconColor, size: 24),
-                    
+
                     // Bottom line
                     if (!isLast)
                       Expanded(
-                        child: Container(
-                          width: 2,
-                          color: Colors.grey[300],
-                        ),
+                        child: Container(width: 2, color: Colors.grey[300]),
                       )
                     else
                       const Expanded(child: SizedBox()),
                   ],
                 ),
               ),
-              
+
               // Content
               Expanded(
                 child: Padding(
@@ -240,7 +251,9 @@ class _TrackReportBottomSheetState extends State<TrackReportBottomSheet> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      if (item['remarks'] != null && item['remarks'].toString().isNotEmpty && item['remarks'].toString() != "null")
+                      if (item['remarks'] != null &&
+                          item['remarks'].toString().isNotEmpty &&
+                          item['remarks'].toString() != "null")
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Text(
@@ -253,7 +266,11 @@ class _TrackReportBottomSheetState extends State<TrackReportBottomSheet> {
                         ),
                       Row(
                         children: [
-                          Icon(Icons.schedule, size: 14, color: Colors.grey[500]),
+                          Icon(
+                            Icons.schedule,
+                            size: 14,
+                            color: Colors.grey[500],
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             _formatDate(item['created_at']),
@@ -262,9 +279,15 @@ class _TrackReportBottomSheetState extends State<TrackReportBottomSheet> {
                               color: Colors.grey[500],
                             ),
                           ),
-                          if (item['user_designation'] != null && item['user_designation'].toString() != "null") ...[
+                          if (item['user_designation'] != null &&
+                              item['user_designation'].toString() !=
+                                  "null") ...[
                             const SizedBox(width: 8),
-                            Icon(Icons.person, size: 14, color: Colors.grey[500]),
+                            Icon(
+                              Icons.person,
+                              size: 14,
+                              color: Colors.grey[500],
+                            ),
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
@@ -277,7 +300,7 @@ class _TrackReportBottomSheetState extends State<TrackReportBottomSheet> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                          ]
+                          ],
                         ],
                       ),
                     ],
@@ -294,7 +317,7 @@ class _TrackReportBottomSheetState extends State<TrackReportBottomSheet> {
   String _formatDate(dynamic dateString) {
     if (dateString == null) return '';
     try {
-      final date = DateTime.parse(dateString.toString());
+      final date = DateTime.parse(dateString.toString()).toLocal();
       return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
     } catch (e) {
       return dateString.toString();

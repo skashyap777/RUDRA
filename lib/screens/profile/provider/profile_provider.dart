@@ -235,4 +235,50 @@ class ProfileProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Sends a citizen account-deletion request to the backend.
+  /// POST /admin/citizen-account-deletion-request
+  Future<DeletionRequestResult> requestAccountDeletion({
+    required String mobileNumber,
+    String? reason,
+  }) async {
+    try {
+      debugPrint(
+          "🚀 [requestAccountDeletion] Submitting deletion request for: $mobileNumber");
+
+      final body = <String, dynamic>{
+        "mobile": mobileNumber,
+        if (reason != null && reason.isNotEmpty) "reason": reason,
+      };
+
+      final response = await apiService.post(
+        url: "/admin/citizen-account-deletion-request",
+        data: body,
+      );
+
+      debugPrint(
+          "✅ [requestAccountDeletion] Response: ${response.statusCode} - ${response.data}");
+
+      if (response.statusCode == 200 ||
+          response.statusCode == 201 ||
+          response.statusCode == 204) {
+        return DeletionRequestResult.success;
+      }
+      return DeletionRequestResult.failed;
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      debugPrint(
+          "❌ [requestAccountDeletion] DioException: $statusCode - ${e.response?.data}");
+      if (statusCode == 409) {
+        return DeletionRequestResult.alreadySubmitted;
+      }
+      return DeletionRequestResult.failed;
+    } catch (e) {
+      debugPrint("❌ [requestAccountDeletion] Error: $e");
+      return DeletionRequestResult.failed;
+    }
+  }
 }
+
+/// Result type for account deletion API calls.
+enum DeletionRequestResult { success, alreadySubmitted, failed }

@@ -5,12 +5,17 @@ import 'package:rudra/screens/reports/models/report_model.dart';
 class ReportProvider extends ChangeNotifier {
   final apiService = HTTP();
   List<Data> reports = [];
+  List<Data> searchResults = [];
+  bool isSearchMode = false;
   Counts? reportCounts;
   bool isLoading = false;
+  bool isSearchLoading = false;
   String selectedFilter = 'All';
 
   Future<void> fetchReports({String status = 'all'}) async {
     isLoading = true;
+    isSearchMode = false;
+    searchResults = [];
     notifyListeners();
 
     try {
@@ -28,17 +33,51 @@ class ReportProvider extends ChangeNotifier {
         reports = reportModel.data ?? [];
       }
 
-      if (countResponse.statusCode == 200 && countResponse.data['status'] == 'success') {
+      if (countResponse.statusCode == 200 &&
+          countResponse.data['status'] == 'success') {
         reportCounts = Counts.fromJson(countResponse.data['data']);
       }
-      
+
       notifyListeners();
     } catch (e) {
-      print('Error fetching reports: $e');
+      debugPrint('Error fetching reports: $e');
     } finally {
       isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> searchReports(String query) async {
+    if (query.trim().isEmpty) {
+      isSearchMode = false;
+      searchResults = [];
+      notifyListeners();
+      return;
+    }
+    isSearchMode = true;
+    isSearchLoading = true;
+    notifyListeners();
+    try {
+      final response = await apiService.get(
+        url:
+            '/pothole/my-reports?case_search=${Uri.encodeComponent(query.trim())}',
+      );
+      if (response.statusCode == 200) {
+        final reportModel = ReportModel.fromJson(response.data);
+        searchResults = reportModel.data ?? [];
+      }
+    } catch (e) {
+      debugPrint('Error searching reports: $e');
+    } finally {
+      isSearchLoading = false;
+      notifyListeners();
+    }
+  }
+
+  void clearSearch() {
+    isSearchMode = false;
+    searchResults = [];
+    notifyListeners();
   }
 
   void updateFilter(String filter) {
@@ -53,14 +92,14 @@ class ReportProvider extends ChangeNotifier {
 
   List<Data> get filteredReports {
     if (selectedFilter == 'All') return reports;
-    
+
     // Normalize selectedFilter to match server status (Submitted, In progress, Completed, Rejected)
     String searchStatus = selectedFilter.toLowerCase().trim();
     if (searchStatus == 'in progress') searchStatus = 'in_progress';
-    
+
     return reports.where((report) {
       final reportStatus = report.status?.toLowerCase().trim() ?? '';
-      
+
       if (searchStatus == 'in_progress') {
         return reportStatus == 'in_progress' || reportStatus == 'in progress';
       }
@@ -73,7 +112,7 @@ class ReportProvider extends ChangeNotifier {
       if (searchStatus == 'submitted') {
         return reportStatus == 'submitted' || reportStatus == 'submit';
       }
-      
+
       return reportStatus == searchStatus;
     }).toList();
   }
