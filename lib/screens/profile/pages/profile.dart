@@ -6,6 +6,7 @@ import 'package:rudra/config/constants/api_constants.dart';
 import 'package:rudra/config/theme/app_pallet.dart';
 import 'package:rudra/config/utils/assets.dart';
 import 'package:rudra/config/utils/local_storage.dart';
+import 'package:rudra/screens/profile/pages/account_deletion_screen.dart';
 import 'package:rudra/screens/profile/pages/info_screen.dart';
 import 'package:rudra/screens/profile/provider/profile_provider.dart';
 import 'package:provider/provider.dart';
@@ -211,6 +212,22 @@ class _ProfileState extends State<Profile> {
                           HapticFeedback.selectionClick();
                           Navigator.push(context,
                               CupertinoPageRoute(builder: (_) => const PrivacyPolicyScreen()));
+                        },
+                      ),
+                      _buildDivider(),
+                      _buildListTile(
+                        icon: Icons.delete_forever_rounded,
+                        title: "Delete Account",
+                        iconColor: Colors.red,
+                        textColor: Colors.red,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          Navigator.push(
+                            context,
+                            CupertinoPageRoute(
+                              builder: (_) => const AccountDeletionScreen(),
+                            ),
+                          );
                         },
                       ),
                     ],
