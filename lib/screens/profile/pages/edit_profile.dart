@@ -252,9 +252,6 @@ class _EditProfileState extends State<EditProfile> {
                       TextFormField(
                         controller: _locationController,
                         validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return "Address is required";
-                          }
                           return null;
                         },
                         decoration: InputDecoration(
@@ -298,12 +295,12 @@ class _EditProfileState extends State<EditProfile> {
                                 debugPrint("🚀 [EditProfile] nameSuccess status: $nameSuccess");
 
                                 bool addressSuccess = true;
-                                if (newAddress.isNotEmpty && newAddress != currentAddress) {
+                                if (newAddress != currentAddress) {
                                   debugPrint("🚀 [EditProfile] Address modified (from '$currentAddress' to '$newAddress'). Calling updateAddress()...");
                                   addressSuccess = await profileProvider.updateAddress(newAddress, newName: newName);
                                   debugPrint("🚀 [EditProfile] addressSuccess status: $addressSuccess");
                                 } else {
-                                  debugPrint("🚀 [EditProfile] Address unchanged or empty. Skipping updateAddress().");
+                                  debugPrint("🚀 [EditProfile] Address unchanged. Skipping updateAddress().");
                                 }
 
                                 if (nameSuccess && addressSuccess) {

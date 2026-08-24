@@ -148,39 +148,44 @@ class ProfileProvider extends ChangeNotifier {
 
       final nameToUse = newName ?? currentProfile.name ?? "";
       final photoLink = currentProfile.profilePhotoLink;
-      if (photoLink == null || photoLink.isEmpty || photoLink == "null") {
-        debugPrint("❌ [updateAddress] Error: photoLink is null or empty. photoLink: '$photoLink'");
-        return false;
-      }
 
-      // Download the existing profile photo to a temp file
-      final photoUrl = photoLink.startsWith('/') 
-          ? "${ApiConstants.imageBaseUrl}$photoLink" 
-          : "${ApiConstants.imageBaseUrl}/$photoLink";
-          
-      debugPrint("🚀 [updateAddress] Downloading photo from URL: $photoUrl");
-      final httpResponse = await http.get(Uri.parse(Uri.encodeFull(photoUrl)));
-      if (httpResponse.statusCode != 200) {
-        debugPrint("❌ [updateAddress] Failed to download photo. statusCode: ${httpResponse.statusCode}");
-        return false;
-      }
-
-      final tempDir = await getTemporaryDirectory();
-      final tempFile = File('${tempDir.path}/temp_profile_photo.jpg');
-      await tempFile.writeAsBytes(httpResponse.bodyBytes);
-      debugPrint("✅ [updateAddress] Photo successfully downloaded to temp file: ${tempFile.path}");
-
-      // Call POST /profile/create with same photo + new address
-      debugPrint("🚀 [updateAddress] Calling POST /profile/create with name: '$nameToUse', com_address: '$newAddress'");
-      final formData = FormData.fromMap({
+      final Map<String, dynamic> mapData = {
         "name": nameToUse,
         "com_address": newAddress,
-        "profile_photo": await MultipartFile.fromFile(
-          tempFile.path,
-          filename: "profile_photo.jpg",
-          contentType: DioMediaType("image", "jpeg"),
-        ),
-      });
+      };
+
+      if (photoLink != null && photoLink.isNotEmpty && photoLink != "null") {
+        // Download the existing profile photo to a temp file
+        final photoUrl = photoLink.startsWith('/') 
+            ? "${ApiConstants.imageBaseUrl}$photoLink" 
+            : "${ApiConstants.imageBaseUrl}/$photoLink";
+            
+        debugPrint("🚀 [updateAddress] Downloading photo from URL: $photoUrl");
+        try {
+          final httpResponse = await http.get(Uri.parse(Uri.encodeFull(photoUrl)));
+          if (httpResponse.statusCode == 200) {
+            final tempDir = await getTemporaryDirectory();
+            final tempFile = File('${tempDir.path}/temp_profile_photo.jpg');
+            await tempFile.writeAsBytes(httpResponse.bodyBytes);
+            debugPrint("✅ [updateAddress] Photo successfully downloaded to temp file: ${tempFile.path}");
+            mapData["profile_photo"] = await MultipartFile.fromFile(
+              tempFile.path,
+              filename: "profile_photo.jpg",
+              contentType: DioMediaType("image", "jpeg"),
+            );
+          } else {
+            debugPrint("⚠️ [updateAddress] Failed to download photo. statusCode: ${httpResponse.statusCode}");
+          }
+        } catch (e) {
+          debugPrint("⚠️ [updateAddress] Exception while downloading photo: $e");
+        }
+      } else {
+        debugPrint("ℹ️ [updateAddress] No existing photoLink found. Proceeding without photo.");
+      }
+
+      // Call POST /profile/create with name + com_address (+ optional photo)
+      debugPrint("🚀 [updateAddress] Calling POST /profile/create with name: '$nameToUse', com_address: '$newAddress'");
+      final formData = FormData.fromMap(mapData);
 
       final response = await apiService.postMultipart(
         url: "/profile/create",

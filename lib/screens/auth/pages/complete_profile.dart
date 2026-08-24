@@ -91,14 +91,6 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
   void _continue() async {
     if (_formKey.currentState?.validate() ?? false) {
-      // Validate that profile photo is selected
-      if (profilePhoto == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select a profile photo')),
-        );
-        return;
-      }
-
       setState(() {
         isLoading = true;
       });
@@ -106,24 +98,28 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       try {
         final provider = Provider.of<AuthProvider>(context, listen: false);
 
-        // Get the correct content type based on file extension
-        final fileExtension = profilePhoto!.path.split('.').last.toLowerCase();
-        final contentType =
-            fileExtension == 'png'
-                ? 'image/png'
-                : fileExtension == 'jpg' || fileExtension == 'jpeg'
-                ? 'image/jpeg'
-                : 'image/jpeg'; // default fallback
+        final Map<String, dynamic> formMap = {
+          'name': _nameController.text.trim(),
+          'com_address': _addressController.text.trim(),
+        };
 
-        final formData = FormData.fromMap({
-          'name': _nameController.text,
-          'com_address': _addressController.text,
-          'profile_photo': await MultipartFile.fromFile(
+        if (profilePhoto != null) {
+          final fileExtension = profilePhoto!.path.split('.').last.toLowerCase();
+          final contentType =
+              fileExtension == 'png'
+                  ? 'image/png'
+                  : fileExtension == 'jpg' || fileExtension == 'jpeg'
+                  ? 'image/jpeg'
+                  : 'image/jpeg'; // default fallback
+
+          formMap['profile_photo'] = await MultipartFile.fromFile(
             profilePhoto!.path,
             filename: profilePhoto!.path.split("/").last,
             contentType: DioMediaType.parse(contentType),
-          ),
-        });
+          );
+        }
+
+        final formData = FormData.fromMap(formMap);
 
         final res = await provider.createProfile(formData);
         if (res) {
@@ -186,7 +182,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Please provide your name and photo before continuing.',
+                'Please provide your details before continuing.',
                 style: TextStyle(fontSize: 14, color: Colors.grey),
               ),
               const SizedBox(height: 24),
@@ -232,17 +228,12 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               const SizedBox(height: 24),
 
               // Address Field
-              RichText(
-                text: const TextSpan(
-                  text: 'Enter Address for Communication',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black,
-                  ),
-                  children: [
-                    TextSpan(text: '*', style: TextStyle(color: Colors.red)),
-                  ],
+              const Text(
+                'Enter Address for Communication',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
                 ),
               ),
               const SizedBox(height: 8),
@@ -273,9 +264,6 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                   ),
                 ),
                 validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter your address';
-                  }
                   return null;
                 },
               ),
