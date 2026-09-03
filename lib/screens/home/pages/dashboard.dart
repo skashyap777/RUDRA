@@ -491,12 +491,7 @@ class _DashboardState extends State<Dashboard> {
   }
 
   String _formatShortDate(String dateTimeString) {
-    try {
-      DateTime dateTime = DateTime.parse(dateTimeString).toLocal();
-      return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}';
-    } catch (e) {
-      return '';
-    }
+    return AppFunctions.formatIndianDate(dateTimeString);
   }
 
   String _buildShortLocation(rudra_report.Data report) {

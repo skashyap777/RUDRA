@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:rudra/config/theme/app_pallet.dart';
+import 'package:rudra/config/utils/app_functions.dart';
 import 'package:rudra/screens/notifications/pages/notifications.dart';
 import 'package:rudra/screens/reports/models/report_model.dart';
 import 'package:rudra/screens/reports/provider/report_provider.dart';
@@ -338,14 +339,22 @@ class _ReportState extends State<Report> {
   }
 
   Widget _buildReportCard(BuildContext context, Data report) {
+    final String dateStr = report.caseCreatedAt ?? report.createdAt ?? '';
+    final int elapsedDays = AppFunctions.getDaysElapsed(dateStr);
+    final String elapsedText = AppFunctions.getDaysElapsedText(dateStr);
+    final bool isCompleted = report.status?.toLowerCase() == 'completed' ||
+        report.status?.toLowerCase() == 'complete';
+    final bool isOverdue = !isCompleted && elapsedDays >= 7;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: isOverdue ? Border.all(color: Colors.red[300]!, width: 1.5) : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.05),
+            color: isOverdue ? Colors.red.withOpacity(0.08) : Colors.grey.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -364,36 +373,71 @@ class _ReportState extends State<Report> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header: Status and Date
+                // Header: Status, Overdue warning, and Date
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(
-                          report.status ?? '',
-                        ).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _formatStatus(report.status ?? ''),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: _getStatusColor(report.status ?? ''),
-                          fontWeight: FontWeight.w600,
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getStatusColor(
+                              report.status ?? '',
+                            ).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _formatStatus(report.status ?? ''),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _getStatusColor(report.status ?? ''),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
-                      ),
+                        if (isOverdue) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red[50],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red[300]!),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.warning_amber_rounded,
+                                  size: 12,
+                                  color: Colors.red[700],
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'OVERDUE',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.red[700],
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     Text(
-                      _formatDateTime(
-                        report.caseCreatedAt ?? report.createdAt ?? '',
-                      ),
+                      _formatDateTime(dateStr),
                       style: const TextStyle(
                         fontSize: 12,
+                        fontWeight: FontWeight.w500,
                         color: AppPallet.textSecondary,
                       ),
                     ),
@@ -425,25 +469,61 @@ class _ReportState extends State<Report> {
                             ),
                           ),
                           const SizedBox(height: 6),
-                          RichText(
-                            text: TextSpan(
-                              text: 'Report ID: ',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: AppPallet.textSecondary,
-                              ),
-                              children: [
-                                TextSpan(
-                                  text: report.caseNo ?? 'N/A',
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              RichText(
+                                text: TextSpan(
+                                  text: 'Report ID: ',
                                   style: const TextStyle(
                                     fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppPallet.primaryColor,
+                                    color: AppPallet.textSecondary,
+                                  ),
+                                  children: [
+                                    TextSpan(
+                                      text: report.caseNo ?? 'N/A',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppPallet.primaryColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'Reported $elapsedText',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isOverdue ? Colors.red[800] : Colors.grey[700],
+                                    fontWeight: isOverdue ? FontWeight.bold : FontWeight.w500,
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
+                          if (report.pendingAt != null && report.pendingAt!.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Pending At: ${report.pendingAt}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: isOverdue ? Colors.red[800] : AppPallet.primaryColor,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -467,11 +547,14 @@ class _ReportState extends State<Report> {
                                 padding: EdgeInsets.only(
                                   bottom:
                                       MediaQuery.of(context).viewInsets.bottom,
-                                  top: MediaQuery.of(context).size.height * 0.2,
+                                  top: MediaQuery.of(context).size.height * 0.15,
                                 ),
                                 child: TrackReportBottomSheet(
                                   caseId: report.id ?? 0,
                                   caseNo: report.caseNo ?? '',
+                                  createdAt: report.caseCreatedAt ?? report.createdAt,
+                                  pendingAt: report.pendingAt,
+                                  status: report.status,
                                 ),
                               ),
                         );
@@ -590,12 +673,7 @@ class _ReportState extends State<Report> {
   }
 
   String _formatDateTime(String dateTimeString) {
-    try {
-      DateTime dateTime = DateTime.parse(dateTimeString).toLocal();
-      return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year} ${_formatTime(dateTime)}';
-    } catch (e) {
-      return '--:--';
-    }
+    return AppFunctions.formatIndianDateTime(dateTimeString);
   }
 
   String _formatTime(DateTime dateTime) {
@@ -608,6 +686,7 @@ class _ReportState extends State<Report> {
 
     return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period';
   }
+
 
   String _getFullImageUrl(String imageUrl) {
     // If the URL is already complete, return it as is

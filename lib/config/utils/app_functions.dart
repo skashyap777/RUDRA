@@ -77,11 +77,72 @@ class AppFunctions {
     ScaffoldMessenger.of(context).showSnackBar(snackBar);
   }
 
-  // static Future<void> loadModel() async {
-  //   String? res = await Tflite.loadModel(
-  //     model: "assets/pothole_model.tflite",
-  //     labels: "assets/labels.txt",
-  //   );
-  //   print("Model loaded: $res");
-  // }
+  static String formatIndianDate(dynamic dateInput) {
+    if (dateInput == null || dateInput.toString().trim().isEmpty) return '';
+    try {
+      DateTime dt;
+      if (dateInput is DateTime) {
+        dt = dateInput.toLocal();
+      } else {
+        dt = DateTime.parse(dateInput.toString()).toLocal();
+      }
+      String day = dt.day.toString().padLeft(2, '0');
+      String month = dt.month.toString().padLeft(2, '0');
+      String year = dt.year.toString().substring(2);
+      return '$day-$month-$year';
+    } catch (e) {
+      return dateInput.toString();
+    }
+  }
+
+  static String formatIndianDateTime(dynamic dateInput) {
+    if (dateInput == null || dateInput.toString().trim().isEmpty) return '';
+    try {
+      DateTime dt;
+      if (dateInput is DateTime) {
+        dt = dateInput.toLocal();
+      } else {
+        dt = DateTime.parse(dateInput.toString()).toLocal();
+      }
+      String day = dt.day.toString().padLeft(2, '0');
+      String month = dt.month.toString().padLeft(2, '0');
+      String year = dt.year.toString().substring(2);
+      
+      int hour = dt.hour;
+      int minute = dt.minute;
+      String period = hour >= 12 ? 'PM' : 'AM';
+      if (hour > 12) hour -= 12;
+      if (hour == 0) hour = 12;
+      String formattedTime = '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period';
+      
+      return '$day-$month-$year $formattedTime';
+    } catch (e) {
+      return dateInput.toString();
+    }
+  }
+
+  static int getDaysElapsed(dynamic dateInput) {
+    if (dateInput == null || dateInput.toString().trim().isEmpty) return 0;
+    try {
+      DateTime dt;
+      if (dateInput is DateTime) {
+        dt = dateInput.toLocal();
+      } else {
+        dt = DateTime.parse(dateInput.toString()).toLocal();
+      }
+      final now = DateTime.now();
+      final difference = now.difference(dt);
+      return difference.inDays;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  static String getDaysElapsedText(dynamic dateInput) {
+    final days = getDaysElapsed(dateInput);
+    if (days == 0) return 'Today';
+    if (days == 1) return '1 day ago';
+    return '$days days ago';
+  }
 }
+

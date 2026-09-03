@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:rudra/config/theme/app_pallet.dart';
+import 'package:rudra/config/utils/app_functions.dart';
 import 'package:rudra/screens/notifications/models/notifiction_model.dart';
 import 'package:rudra/screens/notifications/provider/notification_provider.dart';
 import 'package:provider/provider.dart';
@@ -500,7 +501,7 @@ class _NotificationsState extends State<Notifications> {
     } else if (notificationDateOnly == yesterday) {
       return 'Yesterday';
     } else {
-      return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}';
+      return AppFunctions.formatIndianDate(dateTime);
     }
   }
 }
